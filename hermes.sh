@@ -148,7 +148,13 @@ if [[ "$ENGINE" == "sglang" ]]; then
     --host \"$HOST\" \
     --port \"$PORT\"" 2>&1 | tee -a "$LOG_FILE" &
 elif [[ "$ENGINE" == "vllm" ]]; then
-  bash -lc "uv run vllm serve \"$MODEL\" \
+  # Use system vllm if --install none, otherwise use uv venv
+  if [[ "$INSTALL" == "none" ]]; then
+    cmd="vllm serve"
+  else
+    cmd="uv run vllm serve"
+  fi
+  bash -lc "$cmd \"$MODEL\" \
     --host \"$HOST\" \
     --port \"$PORT\" \
     --tensor-parallel-size \"$TP\" \
