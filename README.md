@@ -30,7 +30,7 @@ chmod +x hermes.sh lib/hermes_tui.sh
 ```
 --engine          sglang | vllm
 --model           HF repo id or local path
---tp              Tensor parallel size (default: 4)
+--tp              Tensor parallel size (default: 4, tune for your GPUs)
 --host            Bind host (default: 0.0.0.0)
 --port            Bind port (default: 30000)
 --install         sglang|vllm|both|none (default: both)
@@ -74,8 +74,8 @@ tail -f hermes.log
 # vLLM: broader model support
 ./hermes.sh --engine vllm --model mistralai/Mistral-7B-v0.1
 
-# Custom model with vLLM
-./hermes.sh --engine vllm --model IQuestLab/IQuest-Coder-V1-40B-Loop-Instruct --tp 4
+# Custom model with vLLM (recommended: --tp 8 for 40B models on H100)
+./hermes.sh --engine vllm --model IQuestLab/IQuest-Coder-V1-40B-Loop-Instruct --tp 8
 
 # Disable optional studio instructions
 ./hermes.sh --engine vllm --model model-id --studio 0

@@ -139,7 +139,8 @@ if [[ "$ENGINE" == "sglang" ]]; then
     --host \"$HOST\" \
     --port \"$PORT\"" >>"$LOG_FILE" 2>&1 &
 elif [[ "$ENGINE" == "vllm" ]]; then
-  bash -lc "uv run vllm serve \"$MODEL\" \
+  bash -lc "uv run python -m vllm.entrypoints.openai.api_server \
+    --model \"$MODEL\" \
     --host \"$HOST\" \
     --port \"$PORT\" \
     --tensor-parallel-size \"$TP\" \
