@@ -19,6 +19,7 @@ VENV_DIR=".venv"
 STUDIO="1"         # 1|0 - launch vllm-studio controller
 STUDIO_PORT="8000"
 FRONTEND="0"       # 1|0 - launch vllm-studio frontend
+EXTRA_ARGS=""      # Additional engine-specific args
 
 usage() {
   banner
@@ -34,6 +35,7 @@ Options:
   --host          Bind host (default: 0.0.0.0)
   --port          Bind port (default: 30000)
   --install       sglang|vllm|both|none (default: both)
+  --extra-args    Additional engine flags (e.g., '--enable-reasoning --reasoning-parser deepseek_r1')
   --no-verify     Skip request verification
   --no-readiness  Skip server readiness check
   --daemon        Keep server running in background
@@ -57,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --host)   HOST="${2:-}"; shift 2 ;;
     --port)   PORT="${2:-}"; shift 2 ;;
     --install) INSTALL="${2:-}"; shift 2 ;;
+    --extra-args) EXTRA_ARGS="${2:-}"; shift 2 ;;
     --no-verify) VERIFY="0"; shift ;;
     --no-readiness) READINESS="0"; shift ;;
     --daemon) DAEMON="1"; shift ;;
@@ -149,7 +152,8 @@ elif [[ "$ENGINE" == "vllm" ]]; then
     --host \"$HOST\" \
     --port \"$PORT\" \
     --tensor-parallel-size \"$TP\" \
-    --trust-remote-code" 2>&1 | tee -a "$LOG_FILE" &
+    --trust-remote-code \
+    $EXTRA_ARGS" 2>&1 | tee -a "$LOG_FILE" &
 else
   die "Invalid engine: $ENGINE"
 fi
