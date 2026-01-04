@@ -1,0 +1,4 @@
+2026-01-04 23:50:18 [INFO] Log file: ./hermes.log
+2026-01-04 23:50:18 [INFO] SGLang repo: https://github.com/sgl-project/sglang
+2026-01-04 23:50:18 [INFO] vLLM repo  : https://github.com/vllm-project/vllm
+2026-01-04 23:50:18 [ERROR] nvidia-smi not found; GPU not visible.

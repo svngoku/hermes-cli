@@ -20,8 +20,8 @@ STUDIO_PORT="8000"
 FRONTEND="0"       # 1|0 - launch vllm-studio frontend
 
 usage() {
+  banner
   cat <<EOF
-Hermes — RunPod LLM Serving TUI
 
 Usage:
   ./hermes.sh --engine {sglang|vllm} --model <hf_repo_or_path> [options]
@@ -45,6 +45,8 @@ Options:
 EOF
 }
 
+tui_init
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --engine) ENGINE="${2:-}"; shift 2 ;;
@@ -67,7 +69,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-tui_init
 trap 'die "Unexpected error on line $LINENO (see $LOG_FILE)"' ERR
 
 banner
