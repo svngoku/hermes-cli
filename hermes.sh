@@ -173,12 +173,17 @@ BASE="http://127.0.0.1:${PORT}"
 if [[ "$READINESS" == "1" ]]; then
   step "Readiness"
   
+  # Brief wait for initialization
+  sleep 2
+  
   # Check if server process is still alive
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then
     fail "Server process died (pid=$SERVER_PID)"
-    log_error "Server crash detected. Check logs:"
-    log_error "  tail -100 $LOG_FILE"
-    die "Server failed to start"
+    log_error "Server crash detected. Last 20 lines of log:"
+    log_error ""
+    tail -20 "$LOG_FILE" | sed 's/^/  /'
+    log_error ""
+    die "Server failed to start - check log above"
   fi
   
   run_task "Waiting for server readiness" "for i in \$(seq 1 180); do \
