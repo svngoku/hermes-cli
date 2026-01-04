@@ -49,6 +49,13 @@ chmod +x hermes.sh lib/hermes_tui.sh
 
 - Requires: `bash 4+`, `tput`, `curl`, `nvidia-smi`
 - Tested: Ubuntu 22.04+ with CUDA 12+
+- vLLM version: 0.6.0+ (0.9.0+ for reasoning features)
+
+To upgrade vLLM to latest:
+```bash
+rm -rf .venv  # Hermes will recreate it
+./hermes.sh --engine vllm --model <any-model>
+```
 
 ## What's Included
 
@@ -74,8 +81,11 @@ tail -f hermes.log
 # vLLM: broader model support
 ./hermes.sh --engine vllm --model mistralai/Mistral-7B-v0.1
 
-# Custom model with vLLM (recommended: --tp 8 for 40B models on H100)
-./hermes.sh --engine vllm --model IQuestLab/IQuest-Coder-V1-40B-Loop-Instruct --tp 8
+# vLLM with reasoning (Qwen3, requires vLLM 0.9.0+)
+./hermes.sh --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
+
+# vLLM with DeepSeek R1 reasoning (requires vLLM 0.9.0+)
+./hermes.sh --engine vllm --model Qwen/Qwen3-8B --extra-args "--enable-reasoning --reasoning-parser deepseek_r1"
 
 # Disable optional studio instructions
 ./hermes.sh --engine vllm --model model-id --studio 0
