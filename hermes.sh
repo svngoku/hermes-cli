@@ -131,26 +131,31 @@ fi
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
 log_info "Serving: engine=$ENGINE model=$MODEL tp=$TP host=$HOST port=$PORT"
 
+step "Starting $ENGINE server (output below)..."
+hr
+
 if [[ "$ENGINE" == "sglang" ]]; then
   bash -lc "uv run python -m sglang.launch_server \
     --model-path \"$MODEL\" \
     --trust-remote-code \
     --tp-size \"$TP\" \
     --host \"$HOST\" \
-    --port \"$PORT\"" >>"$LOG_FILE" 2>&1 &
+    --port \"$PORT\"" 2>&1 | tee -a "$LOG_FILE" &
 elif [[ "$ENGINE" == "vllm" ]]; then
   bash -lc "uv run python -m vllm.entrypoints.openai.api_server \
     --model \"$MODEL\" \
     --host \"$HOST\" \
     --port \"$PORT\" \
     --tensor-parallel-size \"$TP\" \
-    --trust-remote-code" >>"$LOG_FILE" 2>&1 &
+    --trust-remote-code" 2>&1 | tee -a "$LOG_FILE" &
 else
   die "Invalid engine: $ENGINE"
 fi
 
 SERVER_PID="$!"
-ok "Server started (pid=$SERVER_PID)"
+hr
+ok "Server started (pid=$SERVER_PID, watching output above)"
+sleep 3  # Give server time to initialize
 
 # vllm-studio controller (manual setup required)
 if [[ "$STUDIO" == "1" ]]; then
