@@ -110,8 +110,8 @@ run_task "Creating venv ($VENV_DIR)" "uv venv \"$VENV_DIR\""
 case "$INSTALL" in
   none) warn "Skipping engine install (--install none)." ;;
   sglang) run_task "Installing sglang (uv pip)" "uv pip install -U sglang" ;;
-  vllm)   run_task "Installing vllm (uv pip)"   "uv pip install -U vllm" ;;
-  both)   run_task "Installing sglang+vllm (uv pip)" "uv pip install -U sglang vllm" ;;
+  vllm)   run_task "Installing vllm (uv pip)"   "uv pip install -U vllm[fastchat]" ;;
+  both)   run_task "Installing sglang+vllm (uv pip)" "uv pip install -U sglang 'vllm[fastchat]'" ;;
   *) die "Invalid --install: $INSTALL" ;;
 esac
 
