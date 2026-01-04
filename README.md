@@ -53,10 +53,9 @@ chmod +x hermes.sh lib/hermes_tui.sh
 ## What's Included
 
 - **LLM Engines**: SGLang / vLLM with configurable tensor parallelism
-- **vLLM-Studio**: Model lifecycle management, chat UI, recipe saving
-- **Web Interfaces**:
-  - vLLM-Studio controller: `http://localhost:8000`
-  - Optional frontend dev server
+- **Optional vLLM-Studio**: Model lifecycle management, chat UI, recipe saving
+  - Install separately: `pip install -e git+https://github.com/0xSero/vllm-studio.git#egg=vllm-studio`
+  - Run: `vllm-studio --port 8000`
 
 ## Logs
 
@@ -69,18 +68,35 @@ tail -f hermes.log
 ## Quick Examples
 
 ```bash
-# Basic: sglang + studio (default)
+# Basic: sglang engine
 ./hermes.sh --model meta-llama/Llama-2-7b
 
-# vLLM with studio + frontend
-./hermes.sh --engine vllm --model mistralai/Mistral-7B-v0.1 --frontend
+# vLLM engine
+./hermes.sh --engine vllm --model mistralai/Mistral-7B-v0.1
 
-# No studio
+# Disable optional studio instructions
 ./hermes.sh --engine sglang --model openchat/openchat-3.5 --studio 0
 
 # Daemon mode (background)
 ./hermes.sh --model model-id --daemon
 tail -f hermes.log
+```
+
+## vLLM-Studio Setup (Optional)
+
+After hermes server is running, optionally add model management UI:
+
+```bash
+# Clone and install vllm-studio
+git clone https://github.com/0xSero/vllm-studio
+cd vllm-studio
+pip install -e .
+
+# In separate terminal, launch controller
+vllm-studio --port 8000
+
+# Optionally launch frontend dev server
+cd frontend && npm install && npm run dev
 ```
 
 ## References

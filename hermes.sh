@@ -113,7 +113,8 @@ case "$INSTALL" in
 esac
 
 if [[ "$STUDIO" == "1" ]]; then
-  run_task "Installing vllm-studio (uv pip)" "uv pip install -U vllm-studio"
+  log_info "vllm-studio: install from source or use --studio 0 to disable"
+  warn "Skipping vllm-studio (install from repo: pip install -e git+https://github.com/0xSero/vllm-studio.git#egg=vllm-studio)"
 fi
 
 if [[ -z "$ENGINE" ]]; then ENGINE="$(prompt "Choose engine (sglang/vllm)" "sglang")"; fi
@@ -147,17 +148,16 @@ fi
 SERVER_PID="$!"
 ok "Server started (pid=$SERVER_PID)"
 
-# Launch vllm-studio controller
-STUDIO_PID=""
+# vllm-studio controller (manual setup required)
 if [[ "$STUDIO" == "1" ]]; then
-  step "vLLM-Studio"
-  bash -lc "uv run vllm-studio --host \"$HOST\" --port \"$STUDIO_PORT\"" >>"$LOG_FILE" 2>&1 &
-  STUDIO_PID="$!"
-  ok "Studio controller started (pid=$STUDIO_PID)"
-  
+  step "vLLM-Studio (manual setup required)"
+  log_info "To launch vllm-studio controller:"
+  log_info "  cd vllm-studio && pip install -e . && vllm-studio --port $STUDIO_PORT"
   if [[ "$FRONTEND" == "1" ]]; then
-    log_info "Frontend launch: cd frontend && npm install && npm run dev"
+    log_info "To launch frontend:"
+    log_info "  cd vllm-studio/frontend && npm install && npm run dev"
   fi
+  ok "vLLM-Studio instructions provided"
 fi
 
 step "Readiness"
@@ -189,5 +189,5 @@ if [[ "$DAEMON" == "1" ]]; then
 fi
 
 log_info "Foreground mode: Ctrl+C to stop."
-trap 'kill $SERVER_PID 2>/dev/null; [[ -n "$STUDIO_PID" ]] && kill $STUDIO_PID 2>/dev/null; exit 0' SIGINT
+trap 'kill $SERVER_PID 2>/dev/null; exit 0' SIGINT
 wait "$SERVER_PID"
