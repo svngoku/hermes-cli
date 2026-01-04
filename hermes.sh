@@ -129,6 +129,9 @@ if [[ -n "${HUGGING_FACE_HUB_TOKEN:-}" ]]; then
 fi
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}"
+# Disable hf_transfer if not available (optional optimization, not required)
+export HF_HUB_ENABLE_HF_TRANSFER=0
+
 log_info "Serving: engine=$ENGINE model=$MODEL tp=$TP host=$HOST port=$PORT"
 
 step "Starting $ENGINE server (output below)..."
