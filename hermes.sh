@@ -180,7 +180,7 @@ if [[ "$READINESS" == "1" ]]; then
     if curl -sf \"${BASE}/v1/models\" >/dev/null 2>&1; then exit 0; fi; \
     if curl -sf \"${BASE}/health\" >/dev/null 2>&1; then exit 0; fi; \
     sleep 2; \
-  done; echo 'Timeout waiting for server at ${BASE}'; exit 1"
+  done; echo ''; echo 'Timeout waiting for server at \${BASE}'; echo ''; grep -i 'error\|exception\|valueerror\|runtimeerror' \"${LOG_FILE}\" | tail -5; exit 1"
 else
   log_info "Readiness check skipped (--no-readiness)"
 fi

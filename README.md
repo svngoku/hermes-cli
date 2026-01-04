@@ -68,19 +68,34 @@ tail -f hermes.log
 ## Quick Examples
 
 ```bash
-# Basic: sglang engine
+# Basic: sglang (supports Llama, Qwen, Mistral, etc.)
 ./hermes.sh --model meta-llama/Llama-2-7b
 
-# vLLM engine
+# vLLM: broader model support
 ./hermes.sh --engine vllm --model mistralai/Mistral-7B-v0.1
 
+# Custom model with vLLM
+./hermes.sh --engine vllm --model IQuestLab/IQuest-Coder-V1-40B-Loop-Instruct --tp 4
+
 # Disable optional studio instructions
-./hermes.sh --engine sglang --model openchat/openchat-3.5 --studio 0
+./hermes.sh --engine vllm --model model-id --studio 0
 
 # Daemon mode (background)
 ./hermes.sh --model model-id --daemon
 tail -f hermes.log
 ```
+
+### Model Compatibility
+
+**SGLang** (better for latency):
+- ✅ Llama 2/3, Qwen, Mistral, CodeLlama
+- ❌ Custom/new architectures
+
+**vLLM** (broader support):
+- ✅ Most HF models (Llama, Qwen, Mistral, custom architectures)
+- ✅ Better for new/experimental models
+
+If you get `no SGlang implementation` error, switch to vLLM engine.
 
 ## vLLM-Studio Setup (Optional)
 
