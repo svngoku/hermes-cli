@@ -105,13 +105,13 @@ else
 fi
 
 step "Python env + engine install"
-run_task "Creating venv ($VENV_DIR)" "uv venv \"$VENV_DIR\""
+run_task "Creating venv ($VENV_DIR)" "rm -rf \"$VENV_DIR\" && uv venv \"$VENV_DIR\""
 
 case "$INSTALL" in
   none) warn "Skipping engine install (--install none)." ;;
-  sglang) run_task "Installing sglang (uv pip)" "uv pip install -U sglang" ;;
-  vllm)   run_task "Installing vllm (uv pip)"   "uv pip install -U vllm[fastchat]" ;;
-  both)   run_task "Installing sglang+vllm (uv pip)" "uv pip install -U sglang 'vllm[fastchat]'" ;;
+  sglang) run_task "Installing sglang (uv pip)" "uv pip install -U 'sglang>=0.4'" ;;
+  vllm)   run_task "Installing vllm (uv pip)"   "uv pip install -U 'vllm>=0.6'" ;;
+  both)   run_task "Installing sglang+vllm (uv pip)" "uv pip install -U 'sglang>=0.4' 'vllm>=0.6'" ;;
   *) die "Invalid --install: $INSTALL" ;;
 esac
 
