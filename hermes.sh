@@ -13,6 +13,7 @@ PORT="30000"
 TP="4"
 INSTALL="both"     # sglang|vllm|both|none
 VERIFY="1"         # 1|0
+READINESS="1"      # 1|0 - check server readiness
 DAEMON="0"
 VENV_DIR=".venv"
 STUDIO="1"         # 1|0 - launch vllm-studio controller
@@ -34,6 +35,7 @@ Options:
   --port          Bind port (default: 30000)
   --install       sglang|vllm|both|none (default: both)
   --no-verify     Skip request verification
+  --no-readiness  Skip server readiness check
   --daemon        Keep server running in background
   --studio        Launch vllm-studio controller (default: 1)
   --studio-port   vllm-studio controller port (default: 8000)
@@ -56,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     --port)   PORT="${2:-}"; shift 2 ;;
     --install) INSTALL="${2:-}"; shift 2 ;;
     --no-verify) VERIFY="0"; shift ;;
+    --no-readiness) READINESS="0"; shift ;;
     --daemon) DAEMON="1"; shift ;;
     --studio) STUDIO="${2:-1}"; shift 2 ;;
     --studio-port) STUDIO_PORT="${2:-}"; shift 2 ;;
@@ -160,9 +163,27 @@ if [[ "$STUDIO" == "1" ]]; then
   ok "vLLM-Studio instructions provided"
 fi
 
-step "Readiness"
 BASE="http://127.0.0.1:${PORT}"
-run_task "Waiting for /v1/models" "for i in \$(seq 1 180); do curl -sf \"${BASE}/v1/models\" >/dev/null && exit 0; sleep 1; done; exit 1"
+
+if [[ "$READINESS" == "1" ]]; then
+  step "Readiness"
+  
+  # Check if server process is still alive
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    fail "Server process died (pid=$SERVER_PID)"
+    log_error "Server crash detected. Check logs:"
+    log_error "  tail -100 $LOG_FILE"
+    die "Server failed to start"
+  fi
+  
+  run_task "Waiting for server readiness" "for i in \$(seq 1 180); do \
+    if curl -sf \"${BASE}/v1/models\" >/dev/null 2>&1; then exit 0; fi; \
+    if curl -sf \"${BASE}/health\" >/dev/null 2>&1; then exit 0; fi; \
+    sleep 2; \
+  done; echo 'Timeout waiting for server at ${BASE}'; exit 1"
+else
+  log_info "Readiness check skipped (--no-readiness)"
+fi
 
 if [[ "$VERIFY" == "1" ]]; then
   step "Verify requests"
