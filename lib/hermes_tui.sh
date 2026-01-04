@@ -103,10 +103,26 @@ center() {
 
 banner() {
   clear 2>/dev/null || true
-  hr
-  printf "%s" "${MAGENTA}${BOLD}"
-  center "HERMES"
-  printf "%s" "${RESET}"
+  
+  # Try to find banner.txt from SCRIPT_DIR or relative to this lib
+  local banner_file=""
+  if [[ -n "${SCRIPT_DIR:-}" ]]; then
+    banner_file="${SCRIPT_DIR}/assets/banner.txt"
+  fi
+  
+  if [[ -z "$banner_file" ]] || [[ ! -f "$banner_file" ]]; then
+    # Fallback if not found
+    hr
+    printf "%s" "${MAGENTA}${BOLD}"
+    center "HERMES"
+    printf "%s" "${RESET}"
+  else
+    # Display the fancy ASCII art banner
+    printf "%s%s" "${MAGENTA}${BOLD}"
+    cat "$banner_file"
+    printf "%s" "${RESET}"
+  fi
+  
   center "RunPod LLM Serving TUI  •  v${HERMES_VERSION}"
   hr
 }

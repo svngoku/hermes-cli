@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SCRIPT_DIR
 # shellcheck source=lib/hermes_tui.sh
 source "${SCRIPT_DIR}/lib/hermes_tui.sh"
 
