@@ -127,6 +127,43 @@ cd frontend && npm install && npm run dev
 ./hermes.sh --engine vllm --model Qwen/Qwen3-8B --studio-port 8001
 ```
 
+## API Inference Examples
+
+Once the server is running, you can make requests to the OpenAI-compatible API:
+
+### Text Completion
+```bash
+curl -X POST "http://localhost:30000/v1/completions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-8B",
+    "prompt": "Write a short haiku about GPUs.",
+    "max_tokens": 128,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "stream": false
+  }'
+```
+
+### Chat Completion
+```bash
+curl -X POST "http://localhost:30000/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen3-8B",
+    "messages": [
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 512
+  }'
+```
+
+### List Available Models
+```bash
+curl http://localhost:30000/v1/models
+```
+
 ## References
 
 - [SGLang](https://github.com/sgl-project/sglang)
