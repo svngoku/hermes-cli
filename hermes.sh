@@ -174,11 +174,20 @@ if [[ "$STUDIO" == "1" ]]; then
   step "vLLM-Studio (manual setup required)"
   log_info "To launch vllm-studio controller:"
   log_info "  cd vllm-studio && pip install -e . && vllm-studio --port $STUDIO_PORT"
+  
+  # Check if port is in use
+  if command -v lsof >/dev/null 2>&1; then
+    if lsof -Pi :$STUDIO_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+      warn "Port $STUDIO_PORT is already in use. Use different port:"
+      log_info "  vllm-studio --port 8001"
+    fi
+  fi
+  
   if [[ "$FRONTEND" == "1" ]]; then
-    log_info "To launch frontend:"
+    log_info "To launch frontend (separate terminal):"
     log_info "  cd vllm-studio/frontend && npm install && npm run dev"
   fi
-  ok "vLLM-Studio instructions provided"
+  ok "vLLM-Studio instructions provided (port: $STUDIO_PORT)"
 fi
 
 BASE="http://127.0.0.1:${PORT}"

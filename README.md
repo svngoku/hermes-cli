@@ -111,11 +111,20 @@ git clone https://github.com/0xSero/vllm-studio
 cd vllm-studio
 pip install -e .
 
-# In separate terminal, launch controller
+# In separate terminal, launch controller (default port: 8000)
 vllm-studio --port 8000
 
-# Optionally launch frontend dev server
+# If port 8000 is in use, use different port
+vllm-studio --port 8001
+
+# Optionally launch frontend dev server (in another terminal)
 cd frontend && npm install && npm run dev
+```
+
+### Configure port in hermes
+```bash
+# Use custom port for studio
+./hermes.sh --engine vllm --model Qwen/Qwen3-8B --studio-port 8001
 ```
 
 ## References
