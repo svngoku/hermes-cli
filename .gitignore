@@ -1,6 +1,6 @@
 # Binaries
 bin/
-hermes
+/hermes
 
 # Go
 *.exe
