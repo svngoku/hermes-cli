@@ -2,3 +2,7 @@
 2026-01-04 23:50:18 [INFO] SGLang repo: https://github.com/sgl-project/sglang
 2026-01-04 23:50:18 [INFO] vLLM repo  : https://github.com/vllm-project/vllm
 2026-01-04 23:50:18 [ERROR] nvidia-smi not found; GPU not visible.
+2026/01/05 02:06:05 INFO Usage: hermes doctor [flags]
+2026/01/05 02:06:05 INFO
+2026/01/05 02:06:05 INFO Check GPU, CUDA, and system requirements
+2026/01/05 02:06:05 INFO

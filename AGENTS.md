@@ -2,6 +2,40 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Project Overview
+
+Hermes CLI is a GPU inference server launcher for sglang and vllm, built with Go and the Charm ecosystem.
+
+## Tech Stack
+
+- **Language**: Go 1.24+
+- **CLI**: Custom subcommand router (no Cobra)
+- **UI**: Charm ecosystem (Bubble Tea, Bubbles, Lip Gloss, Huh)
+- **Logging**: charmbracelet/log
+
+## Commands
+
+```bash
+make build        # Build binary to bin/hermes
+make test         # Run tests
+make lint         # Run go vet
+go vet ./...      # Type check
+```
+
+## Repository Layout
+
+```
+cmd/hermes/         # Main entry point
+internal/
+  app/              # AppContext, global config
+  commands/         # Command implementations (doctor, install, serve, verify, studio, run)
+  config/           # Typed config structs
+  engine/           # Engine interface (sglang, vllm)
+  execx/            # Process execution helpers
+  ui/               # Lip Gloss styles
+  ui/tui/           # Bubble Tea components (spinner, steps, forms)
+```
+
 ## Quick Reference
 
 ```bash
