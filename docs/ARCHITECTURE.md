@@ -1,0 +1,158 @@
+# ARCHITECTURE — Hermes CLI
+
+> System shape, layer rules, and golden principles. This is ground truth for
+> how code is allowed to depend on other code.
+
+Hermes CLI is a GPU inference server launcher for **sglang** and **vllm**, built
+in Go with the Charm ecosystem for terminal UI.
+
+---
+
+## 1. System Context
+
+```mermaid
+flowchart LR
+    user([Operator]) -->|hermes serve/run/doctor| cli[Hermes CLI]
+    cli -->|uv pip install / venv| uv[(uv toolchain)]
+    cli -->|launch process| engine{Inference Engine}
+    engine --> sglang[sglang.launch_server]
+    engine --> vllm[vllm serve]
+    cli -->|HTTP health/verify| api[(OpenAI-compatible API)]
+    sglang --> api
+    vllm --> api
+    cli -->|nvidia-smi / nvcc| gpu[(NVIDIA GPU + CUDA)]
+    cli -->|read/write| state[(~/.cache/hermes/state.json)]
+```
+
+The CLI is an orchestrator: it never serves inference itself. It detects the
+environment, installs engines via `uv`, launches the chosen engine as a
+subprocess, and verifies the resulting OpenAI-compatible endpoint.
+
+---
+
+## 2. Layer Model
+
+The Go packages map onto a classic inward-pointing dependency model. Adapt the
+generic Types→Config→Repo→Service→Runtime→UI model to this codebase:
+
+```mermaid
+flowchart TD
+    subgraph Core["Pure core (no side effects)"]
+        config[internal/config<br/>typed config structs]
+    end
+    subgraph Domain["Domain"]
+        engine[internal/engine<br/>Engine interface: sglang, vllm]
+    end
+    subgraph Runtime["Runtime / orchestration"]
+        commands[internal/commands<br/>doctor, install, serve, verify, studio, run]
+        app[internal/app<br/>AppContext, global wiring]
+    end
+    subgraph Edges["Impure edges (I/O, processes)"]
+        execx[internal/execx<br/>process execution]
+    end
+    subgraph UI["Presentation"]
+        ui[internal/ui<br/>Lip Gloss styles]
+        tui[internal/ui/tui<br/>Bubble Tea components]
+    end
+    entry[cmd/hermes<br/>main entry point]
+
+    entry --> commands
+    commands --> app
+    commands --> engine
+    commands --> execx
+    commands --> ui
+    commands --> tui
+    engine --> config
+    engine --> execx
+    app --> config
+    tui --> ui
+```
+
+**Dependency direction rule:** arrows point from more-volatile to more-stable.
+`config` depends on nothing internal. `engine` depends only on `config` and
+`execx`. `cmd/hermes` is the only package allowed to wire everything together.
+
+---
+
+## 3. Engine Abstraction
+
+All inference backends implement one interface, so commands stay
+engine-agnostic.
+
+```mermaid
+classDiagram
+    class Engine {
+        <<interface>>
+        +Name() string
+        +CheckInstalled(ctx) (bool, string, error)
+        +Install(ctx) error
+        +ServeCommand(cfg ServeConfig) (string, []string)
+    }
+    class SGLangEngine
+    class VLLMEngine
+    Engine <|.. SGLangEngine
+    Engine <|.. VLLMEngine
+    SGLangEngine ..> ServeConfig
+    VLLMEngine ..> ServeConfig
+```
+
+Adding a new engine means implementing `Engine` and registering it in
+`engine.Get` — no command code changes.
+
+---
+
+## 4. Serve Flow
+
+```mermaid
+sequenceDiagram
+    actor U as Operator
+    participant C as commands/serve
+    participant E as engine.Engine
+    participant X as execx
+    participant P as Engine process
+    participant V as commands/verify
+
+    U->>C: hermes serve --engine vllm --model ...
+    C->>E: ServeCommand(cfg)
+    E-->>C: (bin, args)
+    C->>X: Run / Start(bin, args)
+    X->>P: spawn subprocess
+    P-->>X: stdout/stderr stream
+    C->>V: poll /health (optional)
+    V->>P: HTTP GET /health
+    P-->>V: 200 OK
+    V-->>U: server ready
+```
+
+---
+
+## 5. Golden Principles (mechanical, linter-enforced)
+
+| ID | Principle | Enforcement |
+|----|-----------|-------------|
+| **GP-1** | **Dependency direction is inward.** `config` imports nothing internal; `engine` imports only `config`/`execx`; only `cmd/hermes` wires the graph. | `go vet` + import-cycle check; future depguard rule |
+| **GP-2** | **Entry points only wire.** `cmd/hermes` contains routing and flag parsing, never business logic. | Review + size budget |
+| **GP-3** | **Errors carry context.** Wrap with `fmt.Errorf("...: %w", err)`; never discard errors silently (`_ =`) outside best-effort cleanup. | `go vet`, `errcheck` (golangci-lint) |
+| **GP-4** | **No secrets in code.** Tokens, keys, and hosts come from flags/env, never literals. | trufflehog secret scan in CI |
+| **GP-5** | **Context propagates.** Every blocking/process/HTTP call accepts `context.Context` from `AppContext.Ctx`. | Review; `contextcheck` lint |
+| **GP-6** | **Side effects live at the edges.** Process spawning, file I/O, and network calls stay in `execx` and command adapters, not in `config`/`engine` pure logic. | Review + layer rule |
+
+---
+
+## 6. Technology Preferences
+
+- **Language:** Go 1.24+ (`CGO_ENABLED=0`, static binary).
+- **CLI:** custom subcommand router (no Cobra) — keep dependencies minimal.
+- **UI:** Charm ecosystem (Bubble Tea, Bubbles, Lip Gloss, Huh).
+- **Logging:** `charmbracelet/log` (structured, level-aware).
+- **Engine install/runtime:** `uv` for Python venv + package management.
+- **Build:** `make build`; quality gate `make check` (vet + test + build).
+
+---
+
+## 7. Where Decisions Live
+
+- Architectural decisions: [`design-docs/index.md`](design-docs/index.md)
+- Code conventions: [`DESIGN.md`](DESIGN.md)
+- Security invariants: [`SECURITY.md`](SECURITY.md)
+- Active work: [`exec-plans/active/`](exec-plans/active/)

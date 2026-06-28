@@ -72,3 +72,22 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
+## Harness Knowledge Map
+
+This repo follows the harness engineering pattern. `docs/` is the source of truth;
+navigate from here. Use Mermaid for all diagrams and complex concepts.
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System shape, layers, golden principles (GP-1..GP-6) |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | Go conventions, command/engine patterns |
+| [`docs/PRODUCT_SENSE.md`](docs/PRODUCT_SENSE.md) | Purpose, core beliefs, non-goals |
+| [`docs/QUALITY_SCORE.md`](docs/QUALITY_SCORE.md) | Domain grades, tech debt |
+| [`docs/RELIABILITY.md`](docs/RELIABILITY.md) | Targets, critical paths, rollback |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Security invariants, trust boundaries |
+| [`docs/PLANS.md`](docs/PLANS.md) | Active exec-plans index |
+| [`docs/design-docs/`](docs/design-docs/index.md) | ADR catalogue + core beliefs |
+| [`docs/exec-plans/active/`](docs/exec-plans/active/) | In-flight plans (template + lifecycle) |
+
+Plans before code: copy `docs/exec-plans/_template.md` for non-trivial work.
+
