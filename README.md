@@ -28,7 +28,7 @@ make build
 
 - Go 1.24+
 - NVIDIA GPU with `nvidia-smi`
-- Python 3.8+ (for engine installation)
+- Python 3.10+ (for engine installation)
 
 ## Commands
 
@@ -98,7 +98,7 @@ hermes serve --engine vllm --model mistralai/Mistral-7B-v0.1 --port 8080
 hermes serve --engine vllm --model Qwen/Qwen3-8B --daemon
 
 # With extra engine arguments
-hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--enable-reasoning --reasoning-parser qwen3"
+hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
 ```
 
 ### Verify

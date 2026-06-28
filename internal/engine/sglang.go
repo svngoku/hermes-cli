@@ -30,7 +30,7 @@ func (e *SGLangEngine) CheckInstalled(ctx context.Context) (bool, string, error)
 }
 
 func (e *SGLangEngine) Install(ctx context.Context) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "-U", "sglang>=0.4")
+	result := execx.Run(ctx, "uv", "pip", "install", "-U", "sglang>=0.5")
 	if result.ExitCode != 0 {
 		return fmt.Errorf("failed to install sglang: %s", result.Stderr)
 	}

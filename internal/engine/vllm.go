@@ -36,7 +36,7 @@ func (e *VLLMEngine) CheckInstalled(ctx context.Context) (bool, string, error) {
 }
 
 func (e *VLLMEngine) Install(ctx context.Context) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "-U", "vllm>=0.6")
+	result := execx.Run(ctx, "uv", "pip", "install", "-U", "vllm>=0.8")
 	if result.ExitCode != 0 {
 		return fmt.Errorf("failed to install vllm: %s", result.Stderr)
 	}
