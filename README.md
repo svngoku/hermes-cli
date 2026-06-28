@@ -20,7 +20,7 @@ Built with Go and the [Charm](https://charm.sh) ecosystem for delightful termina
 ```bash
 git clone https://github.com/svngoku/hermes-cli.git
 cd hermes-cli
-make build
+just build
 ./bin/hermes --help
 ```
 
@@ -29,6 +29,7 @@ make build
 - Go 1.24+
 - NVIDIA GPU with `nvidia-smi`
 - Python 3.10+ (for engine installation)
+- [`just`](https://github.com/casey/just) (task runner, for development)
 
 ## Commands
 
@@ -191,10 +192,10 @@ The original Bash implementation is still available:
 ## Development
 
 ```bash
-make build     # Build binary
-make test      # Run tests
-make lint      # Run go vet
-make check     # Run all checks
+just build     # Build binary
+just test      # Run tests
+just lint      # Run go vet
+just check     # Run all checks
 ```
 
 ## References

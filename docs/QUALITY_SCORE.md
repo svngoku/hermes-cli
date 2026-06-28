@@ -21,7 +21,7 @@ Grading is intentionally conservative until tests exist.
 
 | ID | Area | Debt | Severity | Status |
 |----|------|------|----------|--------|
-| TD-1 | testing | No `*_test.go` anywhere; `make test` is a no-op. | High | open |
+| TD-1 | testing | No `*_test.go` anywhere; `just test` is a no-op. | High | open |
 | TD-2 | engine | Version floors live in code (`vllm>=0.8`, `sglang>=0.5`); drift risk. | Med | open |
 | TD-3 | ci | No CI enforcing fmt/vet/test until this bootstrap. | Med | addressed by ci.yml |
 

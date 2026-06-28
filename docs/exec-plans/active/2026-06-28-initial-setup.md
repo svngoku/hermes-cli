@@ -33,7 +33,7 @@ flowchart TD
     inspect[Inspect repo] --> docs[Create docs/ knowledge base]
     docs --> ci[Add Go CI: fmt/vet/test/build + secret scan]
     ci --> map[Additive map pointer in AGENTS.md]
-    map --> verify[make check still green]
+    map --> verify[just check still green]
     verify --> commit[Commit scaffolding]
 ```
 

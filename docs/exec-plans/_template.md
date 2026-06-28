@@ -18,7 +18,7 @@ What outcome are we after, and why now?
 
 - [ ] Criterion 1 (observable, testable)
 - [ ] Criterion 2
-- [ ] Quality gate: `make check` passes
+- [ ] Quality gate: `just check` passes
 
 ## Approach
 

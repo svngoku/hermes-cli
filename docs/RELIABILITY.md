@@ -54,5 +54,5 @@ flowchart LR
     ok -- no --> bisect[git bisect on cmd/internal]
 ```
 
-- Tag every release; `make build` embeds `Version`/`Commit`/`BuildDate` via ldflags.
+- Tag every release; `just build` embeds `Version`/`Commit`/`BuildDate` via ldflags.
 - No data migrations exist, so rollback is purely binary-swap — low risk.

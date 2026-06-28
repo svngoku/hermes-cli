@@ -89,4 +89,4 @@ flowchart TD
 - Tests live beside code as `*_test.go` (none yet — see QUALITY_SCORE.md).
 - Prefer table-driven tests for `engine.ServeCommand` arg construction and
   `config` validation — they are pure and cheap to cover.
-- `make test` runs `go test -v ./...`.
+- `just test` runs `go test -v ./...`.

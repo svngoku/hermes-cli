@@ -146,7 +146,7 @@ sequenceDiagram
 - **UI:** Charm ecosystem (Bubble Tea, Bubbles, Lip Gloss, Huh).
 - **Logging:** `charmbracelet/log` (structured, level-aware).
 - **Engine install/runtime:** `uv` for Python venv + package management.
-- **Build:** `make build`; quality gate `make check` (vet + test + build).
+- **Build:** `just build`; quality gate `just check` (vet + test + build).
 
 ---
 

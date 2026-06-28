@@ -16,9 +16,10 @@ Hermes CLI is a GPU inference server launcher for sglang and vllm, built with Go
 ## Commands
 
 ```bash
-make build        # Build binary to bin/hermes
-make test         # Run tests
-make lint         # Run go vet
+just build        # Build binary to bin/hermes
+just test         # Run tests
+just lint         # Run go vet
+just check        # lint + test + build
 go vet ./...      # Type check
 ```
 
