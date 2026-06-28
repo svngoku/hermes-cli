@@ -76,14 +76,26 @@ func Run(ctx *app.AppContext, args []string) error {
 		TP:        *tp,
 		Host:      *host,
 		Port:      *port,
-		Daemon:    *daemon,
+		Daemon:    true, // run engine in the background while we poll and verify
 		ExtraArgs: *extraArgs,
 		LogFile:   ctx.LogFile,
 	}
 
-	if err := runServePhase(ctx, serveCfg); err != nil {
+	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Starting %s with model %s", serveCfg.Engine, serveCfg.Model)))
+
+	serveCmd, serveLog, err := startEngine(ctx, serveCfg)
+	if err != nil {
 		return err
 	}
+	if serveLog != nil {
+		serveCmd.Stdout = serveLog
+		serveCmd.Stderr = serveLog
+		defer serveLog.Close()
+	}
+	if err := serveCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start server: %w", err)
+	}
+	fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Server started (pid=%d)", serveCmd.Process.Pid)))
 
 	base := fmt.Sprintf("http://127.0.0.1:%d", *port)
 
@@ -111,7 +123,7 @@ func Run(ctx *app.AppContext, args []string) error {
 
 	if !*daemon {
 		fmt.Fprintln(ctx.Stdout, ui.Info("Foreground mode: Ctrl+C to stop"))
-		select {}
+		return waitForServer(ctx, serveCmd)
 	}
 
 	return nil
@@ -162,14 +174,6 @@ func runInstallPhase(ctx *app.AppContext, mode config.InstallMode) error {
 	}
 
 	return Install(ctx, []string{"--install", string(mode)})
-}
-
-func runServePhase(ctx *app.AppContext, cfg config.ServeConfig) error {
-	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Starting %s with model %s", cfg.Engine, cfg.Model)))
-
-	cfg.Daemon = true
-
-	return runServe(ctx, cfg)
 }
 
 func waitForReadiness(ctx *app.AppContext, base string, timeout time.Duration) error {

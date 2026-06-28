@@ -46,5 +46,8 @@ func (e *SGLangEngine) ServeCommand(cfg config.ServeConfig) (string, []string) {
 		"--host", cfg.Host,
 		"--port", strconv.Itoa(cfg.Port),
 	}
+	if cfg.ExtraArgs != "" {
+		args = append(args, splitArgs(cfg.ExtraArgs)...)
+	}
 	return "uv", args
 }

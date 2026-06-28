@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/svngoku/hermes-cli/internal/config"
 	"github.com/svngoku/hermes-cli/internal/execx"
@@ -52,7 +51,7 @@ func (e *VLLMEngine) ServeCommand(cfg config.ServeConfig) (string, []string) {
 		"--trust-remote-code",
 	}
 	if cfg.ExtraArgs != "" {
-		args = append(args, strings.Fields(cfg.ExtraArgs)...)
+		args = append(args, splitArgs(cfg.ExtraArgs)...)
 	}
 	return "uv", args
 }

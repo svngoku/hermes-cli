@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -17,21 +18,27 @@ var (
 )
 
 func main() {
+	os.Exit(realMain())
+}
+
+// realMain runs the CLI and returns a process exit code. Keeping os.Exit out of
+// the command path ensures deferred cleanup (AppContext.Close) always runs.
+func realMain() int {
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(0)
+		return 0
 	}
 
 	cmd := os.Args[1]
 
 	if cmd == "-h" || cmd == "--help" || cmd == "help" {
 		printUsage()
-		os.Exit(0)
+		return 0
 	}
 
 	if cmd == "version" || cmd == "--version" || cmd == "-v" {
 		printVersion()
-		os.Exit(0)
+		return 0
 	}
 
 	globalFlags := parseGlobalFlags()
@@ -39,16 +46,21 @@ func main() {
 	appCtx, err := app.NewContext(globalFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error initializing: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer appCtx.Close()
 
 	cmdArgs := filterGlobalFlags(os.Args[2:])
 
 	if err := dispatch(cmd, appCtx, cmdArgs); err != nil {
+		var exitErr *app.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.Code
+		}
 		appCtx.Logger.Error("command failed", "cmd", cmd, "error", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 func parseGlobalFlags() app.GlobalFlags {
@@ -117,7 +129,7 @@ func dispatch(cmd string, ctx *app.AppContext, args []string) error {
 	if !ok {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printUsage()
-		os.Exit(2)
+		return &app.ExitError{Code: 2}
 	}
 	return handler(ctx, args)
 }

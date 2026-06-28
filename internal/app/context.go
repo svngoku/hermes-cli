@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 
@@ -19,6 +20,17 @@ type AppContext struct {
 	NoColor   bool
 	LogFile   string
 	logWriter io.Writer
+	logFile   *os.File
+}
+
+// ExitError lets a command request a specific process exit code without calling
+// os.Exit itself, so deferred cleanup (e.g. AppContext.Close) still runs.
+type ExitError struct {
+	Code int
+}
+
+func (e *ExitError) Error() string {
+	return fmt.Sprintf("exit code %d", e.Code)
 }
 
 type GlobalFlags struct {
@@ -32,12 +44,14 @@ func NewContext(flags GlobalFlags) (*AppContext, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var logWriter io.Writer = os.Stderr
+	var logFile *os.File
 	if flags.LogFile != "" {
 		f, err := os.OpenFile(flags.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			cancel()
 			return nil, err
 		}
+		logFile = f
 		logWriter = io.MultiWriter(os.Stderr, f)
 	}
 
@@ -70,12 +84,13 @@ func NewContext(flags GlobalFlags) (*AppContext, error) {
 		NoColor:   flags.NoColor,
 		LogFile:   flags.LogFile,
 		logWriter: logWriter,
+		logFile:   logFile,
 	}, nil
 }
 
 func (a *AppContext) Close() {
 	a.Cancel()
-	if closer, ok := a.logWriter.(io.Closer); ok && a.logWriter != os.Stderr {
-		closer.Close()
+	if a.logFile != nil {
+		a.logFile.Close()
 	}
 }

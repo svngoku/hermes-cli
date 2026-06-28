@@ -16,7 +16,7 @@
 
 | Plan | Area | Completed |
 |------|------|-----------|
-| _none yet_ | | |
+| [Correctness fixes + initial tests](exec-plans/completed/2026-06-28-correctness-and-tests.md) | commands, app, engine, execx | 2026-06-28 |
 
 ---
 

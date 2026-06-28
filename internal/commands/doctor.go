@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/execx"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
+
+// doctorProbeTimeout bounds each external diagnostic command so a hung tool
+// cannot block `hermes doctor`.
+const doctorProbeTimeout = 10 * time.Second
 
 type CheckStatus string
 
@@ -102,7 +106,13 @@ func Doctor(ctx *app.AppContext, args []string) error {
 	if *jsonOutput {
 		enc := json.NewEncoder(ctx.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(report)
+		if err := enc.Encode(report); err != nil {
+			return err
+		}
+		if report.ExitCode != 0 {
+			return &app.ExitError{Code: report.ExitCode}
+		}
+		return nil
 	}
 
 	fmt.Fprintln(ctx.Stdout, ui.HR())
@@ -114,7 +124,9 @@ func Doctor(ctx *app.AppContext, args []string) error {
 		fmt.Fprintln(ctx.Stdout, ui.Fail(report.Summary))
 	}
 
-	os.Exit(report.ExitCode)
+	if report.ExitCode != 0 {
+		return &app.ExitError{Code: report.ExitCode}
+	}
 	return nil
 }
 
@@ -130,7 +142,7 @@ func checkNvidiaSMI(ctx *app.AppContext, jsonOut bool) CheckResult {
 		return check
 	}
 
-	result := execx.Run(ctx.Ctx, "nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader")
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader")
 	if result.ExitCode != 0 {
 		check.Status = StatusFail
 		check.Message = "nvidia-smi failed"
@@ -167,7 +179,7 @@ func checkCUDA(ctx *app.AppContext, jsonOut bool) CheckResult {
 		return check
 	}
 
-	result := execx.Run(ctx.Ctx, "nvcc", "--version")
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "nvcc", "--version")
 	if result.ExitCode != 0 {
 		check.Status = StatusWarning
 		check.Message = "nvcc failed"
@@ -197,7 +209,7 @@ func checkCUDA(ctx *app.AppContext, jsonOut bool) CheckResult {
 func checkGPUs(ctx *app.AppContext, jsonOut bool) CheckResult {
 	check := CheckResult{Name: "gpu_count"}
 
-	result := execx.Run(ctx.Ctx, "nvidia-smi", "--query-gpu=count", "--format=csv,noheader")
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "nvidia-smi", "--query-gpu=count", "--format=csv,noheader")
 	if result.ExitCode != 0 {
 		check.Status = StatusSkipped
 		check.Message = "Could not query GPU count"
@@ -234,7 +246,7 @@ func checkUV(ctx *app.AppContext, jsonOut bool) CheckResult {
 		return check
 	}
 
-	result := execx.Run(ctx.Ctx, "uv", "--version")
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "uv", "--version")
 	version := strings.TrimSpace(result.Stdout)
 	check.Status = StatusOK
 	check.Message = version
@@ -260,7 +272,7 @@ func checkPython(ctx *app.AppContext, jsonOut bool) CheckResult {
 		pythonCmd = "python"
 	}
 
-	result := execx.Run(ctx.Ctx, pythonCmd, "--version")
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, pythonCmd, "--version")
 	version := strings.TrimSpace(result.Stdout)
 	check.Status = StatusOK
 	check.Message = version

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -78,70 +79,39 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 	}
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 
-	eng := engine.Get(cfg.Engine)
-	if eng == nil {
-		return fmt.Errorf("unknown engine: %s", cfg.Engine)
-	}
-
-	cmdName, cmdArgs := eng.ServeCommand(cfg)
-
-	ctx.Logger.Debug("serve command", "cmd", cmdName, "args", cmdArgs)
-
-	cmd := exec.CommandContext(ctx.Ctx, cmdName, cmdArgs...)
-
-	var logFile *os.File
-	var err error
-	if cfg.LogFile != "" {
-		logFile, err = os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open log file: %w", err)
-		}
-		defer logFile.Close()
+	cmd, logFile, err := startEngine(ctx, cfg)
+	if err != nil {
+		return err
 	}
 
 	if cfg.Daemon {
-		return runDaemon(ctx, cmd, logFile, cfg)
+		if logFile != nil {
+			cmd.Stdout = logFile
+			cmd.Stderr = logFile
+			defer logFile.Close()
+		}
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start daemon: %w", err)
+		}
+		fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Daemon started (pid=%d)", cmd.Process.Pid)))
+		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Endpoint: http://%s:%d", cfg.Host, cfg.Port)))
+		if cfg.LogFile != "" {
+			fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Logs: tail -f %s", cfg.LogFile)))
+		}
+		return nil
 	}
 
-	return runForeground(ctx, cmd, logFile, cfg)
-}
-
-func runDaemon(ctx *app.AppContext, cmd *exec.Cmd, logFile *os.File, cfg config.ServeConfig) error {
 	if logFile != nil {
-		cmd.Stdout = logFile
-		cmd.Stderr = logFile
+		defer logFile.Close()
 	}
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start daemon: %w", err)
-	}
-
-	fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Daemon started (pid=%d)", cmd.Process.Pid)))
-	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Endpoint: http://%s:%d", cfg.Host, cfg.Port)))
-	if cfg.LogFile != "" {
-		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Logs: tail -f %s", cfg.LogFile)))
-	}
-
-	return nil
-}
-
-func runForeground(ctx *app.AppContext, cmd *exec.Cmd, logFile *os.File, cfg config.ServeConfig) error {
 	var writers []io.Writer
 	writers = append(writers, ctx.Stdout)
 	if logFile != nil {
 		writers = append(writers, logFile)
 	}
 	multiWriter := io.MultiWriter(writers...)
-
 	cmd.Stdout = multiWriter
 	cmd.Stderr = multiWriter
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
@@ -152,6 +122,48 @@ func runForeground(ctx *app.AppContext, cmd *exec.Cmd, logFile *os.File, cfg con
 	fmt.Fprintln(ctx.Stdout, ui.Info("Ctrl+C to stop"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 
+	return waitForServer(ctx, cmd)
+}
+
+// startEngine resolves the engine and builds its process. The process is always
+// placed in its own process group so we can signal the whole tree on shutdown.
+// Daemon processes are bound to context.Background() so they survive after the
+// CLI exits; foreground processes inherit the cancelable app context.
+func startEngine(ctx *app.AppContext, cfg config.ServeConfig) (*exec.Cmd, *os.File, error) {
+	eng := engine.Get(cfg.Engine)
+	if eng == nil {
+		return nil, nil, fmt.Errorf("unknown engine: %s", cfg.Engine)
+	}
+
+	cmdName, cmdArgs := eng.ServeCommand(cfg)
+	ctx.Logger.Debug("serve command", "cmd", cmdName, "args", cmdArgs)
+
+	execCtx := ctx.Ctx
+	if cfg.Daemon {
+		execCtx = context.Background()
+	}
+	cmd := exec.CommandContext(execCtx, cmdName, cmdArgs...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	var logFile *os.File
+	if cfg.LogFile != "" {
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+		}
+		logFile = f
+	}
+
+	return cmd, logFile, nil
+}
+
+// waitForServer blocks until the engine exits or the operator interrupts. On
+// SIGINT/SIGTERM it terminates the whole process group and waits for exit.
+func waitForServer(ctx *app.AppContext, cmd *exec.Cmd) error {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
 	done := make(chan error, 1)
 	go func() {
 		done <- cmd.Wait()
@@ -160,7 +172,7 @@ func runForeground(ctx *app.AppContext, cmd *exec.Cmd, logFile *os.File, cfg con
 	select {
 	case sig := <-sigChan:
 		ctx.Logger.Info("received signal, shutting down", "signal", sig)
-		cmd.Process.Signal(syscall.SIGTERM)
+		stopProcess(cmd)
 		<-done
 		fmt.Fprintln(ctx.Stdout)
 		fmt.Fprintln(ctx.Stdout, ui.Ok("Server stopped"))
@@ -171,5 +183,16 @@ func runForeground(ctx *app.AppContext, cmd *exec.Cmd, logFile *os.File, cfg con
 		}
 		fmt.Fprintln(ctx.Stdout, ui.Ok("Server exited"))
 		return nil
+	}
+}
+
+// stopProcess sends SIGTERM to the process group (negative pid) so child
+// workers spawned by the engine are also terminated.
+func stopProcess(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return
+	}
+	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM); err != nil {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
 	}
 }

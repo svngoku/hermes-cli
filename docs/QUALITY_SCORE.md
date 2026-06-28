@@ -8,22 +8,30 @@
 
 | Domain | Grade | Notes |
 |--------|-------|-------|
-| `cmd/hermes` (entry/routing) | C | Works; no tests. |
-| `internal/commands` | C | Functional; zero test coverage. |
-| `internal/engine` | C | Clean interface; `ServeCommand` is pure and easily testable but untested. |
-| `internal/config` | C | Simple structs; needs validation tests. |
-| `internal/execx` | C | Process helpers untested. |
+| `cmd/hermes` (entry/routing) | C | `realMain()` pattern; exit codes via `app.ExitError`. Still untested. |
+| `internal/commands` | C | Process-lifecycle bugs fixed; still no command-level tests. |
+| `internal/engine` | B | `ServeCommand` + arg splitting covered by tests. |
+| `internal/config` | B | Default config helpers covered by tests. |
+| `internal/execx` | B | `Run`/`RunWithTimeout`/`CommandExists` covered by tests. |
 | `internal/ui` + `ui/tui` | C | Presentation only. |
-
-Grading is intentionally conservative until tests exist.
 
 ## 2. Tech Debt Tracker
 
 | ID | Area | Debt | Severity | Status |
 |----|------|------|----------|--------|
-| TD-1 | testing | No `*_test.go` anywhere; `just test` is a no-op. | High | open |
+| TD-1 | testing | No tests at all. Now covered: engine, args, config, execx. Commands/app still uncovered. | High | in_progress |
 | TD-2 | engine | Version floors live in code (`vllm>=0.8`, `sglang>=0.5`); drift risk. | Med | open |
-| TD-3 | ci | No CI enforcing fmt/vet/test until this bootstrap. | Med | addressed by ci.yml |
+| TD-3 | ci | No CI enforcing fmt/vet/test. | Med | fixed (ci.yml) |
+| TD-4 | commands | `serve --daemon` was killed on CLI exit (ctx-bound process). | High | fixed |
+| TD-5 | commands | `doctor` called `os.Exit`, bypassing cleanup. | Med | fixed |
+| TD-6 | app | Log file descriptor never closed (MultiWriter not a Closer). | Med | fixed |
+| TD-7 | commands | Foreground `run` could not stop the engine on Ctrl+C. | High | fixed |
+| TD-8 | engine | `--extra-args` split naively; sglang ignored it entirely. | Med | fixed |
+| TD-9 | execx | No per-probe timeout; a hung tool could block `doctor`. | Med | fixed |
+| TD-10 | commands | No `hermes stop`/`status`; daemons have no PID registry. | Med | open |
+| TD-11 | commands | `verify --chat` hardcodes model `"default"`; should read `/v1/models`. | Low | open |
+| TD-12 | ci | No `.golangci.yml`; no `go test -race`; no depguard for GP-1. | Low | open |
+| TD-13 | config | Typed config structs (`DoctorConfig`, etc.) largely unused. | Low | open |
 
 ## 3. Grading Rubric
 
@@ -43,8 +51,9 @@ flowchart LR
 - **D** — known correctness or reliability gaps.
 - **F** — broken, unsafe, or unbuildable.
 
-## 4. Path to B (next steps)
+## 4. Path to A (next steps)
 
-1. Add table-driven tests for `engine.ServeCommand` (sglang + vllm).
-2. Add validation tests for `config` defaults and install-mode parsing.
-3. Cover `execx.Run` exit-code handling with a fake command.
+1. Add command-level tests (doctor report logic, verify status, install-mode parsing).
+2. Add `hermes stop`/`status` with a PID registry (TD-10).
+3. Make `verify --chat` resolve the model from `/v1/models` (TD-11).
+4. Add `.golangci.yml`, `go test -race`, and a depguard rule enforcing GP-1 (TD-12).

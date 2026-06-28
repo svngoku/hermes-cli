@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type Result struct {
@@ -36,6 +37,14 @@ func Run(ctx context.Context, name string, args ...string) Result {
 		ExitCode: exitCode,
 		Err:      err,
 	}
+}
+
+// RunWithTimeout runs a command with a bounded duration so probes (e.g. a hung
+// nvidia-smi) cannot block the CLI indefinitely.
+func RunWithTimeout(ctx context.Context, timeout time.Duration, name string, args ...string) Result {
+	tctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return Run(tctx, name, args...)
 }
 
 func RunWithStreaming(ctx context.Context, stdout, stderr io.Writer, name string, args ...string) error {
