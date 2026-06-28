@@ -41,6 +41,8 @@ just build
 | `hermes verify` | Verify server is responding |
 | `hermes studio` | Launch vllm-studio controller |
 | `hermes run` | Run full pipeline (doctor → install → serve → verify) |
+| `hermes stop` | Stop a background engine daemon |
+| `hermes status` | List recorded engine daemons |
 
 ## Quick Start
 
@@ -100,6 +102,17 @@ hermes serve --engine vllm --model Qwen/Qwen3-8B --daemon
 
 # With extra engine arguments
 hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
+```
+
+### Daemon management
+
+Background engines are recorded in `~/.cache/hermes/daemons` and can be listed
+and stopped after the launching CLI has exited:
+
+```bash
+hermes status              # list recorded daemons and their health
+hermes stop --port 30000   # stop a specific daemon
+hermes stop --all          # stop every recorded daemon
 ```
 
 ### Verify

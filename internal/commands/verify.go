@@ -78,14 +78,14 @@ func runVerify(ctx *app.AppContext, base string, timeout time.Duration, testChat
 
 	client := &http.Client{Timeout: timeout}
 
-	modelsOK := checkModels(ctx, client, base, jsonOut)
+	modelsOK, modelID := checkModels(ctx, client, base, jsonOut)
 	result.ModelsOK = modelsOK
 
 	healthOK := checkHealth(ctx, client, base, jsonOut)
 	result.HealthOK = healthOK
 
 	if testChat {
-		chatOK := checkChatCompletion(ctx, client, base, jsonOut)
+		chatOK := checkChatCompletion(ctx, client, base, jsonOut, modelID)
 		result.ChatOK = chatOK
 	}
 
@@ -112,19 +112,41 @@ func runVerify(ctx *app.AppContext, base string, timeout time.Duration, testChat
 	return result
 }
 
-func checkModels(ctx *app.AppContext, client *http.Client, base string, jsonOut bool) bool {
+// modelsResponse is the minimal OpenAI-compatible /v1/models shape we need to
+// discover a model id for the chat-completion probe.
+type modelsResponse struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+}
+
+// firstModelID parses the /v1/models body and returns the first model id, or
+// "" if none can be found.
+func firstModelID(body []byte) string {
+	var mr modelsResponse
+	if err := json.Unmarshal(body, &mr); err != nil {
+		return ""
+	}
+	if len(mr.Data) == 0 {
+		return ""
+	}
+	return mr.Data[0].ID
+}
+
+func checkModels(ctx *app.AppContext, client *http.Client, base string, jsonOut bool) (bool, string) {
 	url := base + "/v1/models"
 	resp, err := client.Get(url)
 	if err != nil {
 		if !jsonOut {
 			fmt.Fprintln(ctx.Stdout, ui.Fail(fmt.Sprintf("GET /v1/models: %v", err)))
 		}
-		return false
+		return false, ""
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		modelID := firstModelID(body)
 		if !jsonOut {
 			preview := string(body)
 			if len(preview) > 200 {
@@ -133,13 +155,13 @@ func checkModels(ctx *app.AppContext, client *http.Client, base string, jsonOut 
 			fmt.Fprintln(ctx.Stdout, ui.Ok("GET /v1/models: OK"))
 			fmt.Fprintln(ctx.Stdout, "    "+strings.ReplaceAll(preview, "\n", "\n    "))
 		}
-		return true
+		return true, modelID
 	}
 
 	if !jsonOut {
 		fmt.Fprintln(ctx.Stdout, ui.Fail(fmt.Sprintf("GET /v1/models: %d", resp.StatusCode)))
 	}
-	return false
+	return false, ""
 }
 
 func checkHealth(ctx *app.AppContext, client *http.Client, base string, jsonOut bool) bool {
@@ -166,14 +188,18 @@ func checkHealth(ctx *app.AppContext, client *http.Client, base string, jsonOut 
 	return false
 }
 
-func checkChatCompletion(ctx *app.AppContext, client *http.Client, base string, jsonOut bool) bool {
+func checkChatCompletion(ctx *app.AppContext, client *http.Client, base string, jsonOut bool, modelID string) bool {
+	model := modelID
+	if model == "" {
+		model = "default"
+	}
 	url := base + "/v1/chat/completions"
-	payload := `{
-		"model": "default",
+	payload := fmt.Sprintf(`{
+		"model": %q,
 		"messages": [{"role": "user", "content": "Return OK"}],
 		"max_tokens": 8,
 		"temperature": 0
-	}`
+	}`, model)
 
 	req, err := http.NewRequest("POST", url, strings.NewReader(payload))
 	if err != nil {

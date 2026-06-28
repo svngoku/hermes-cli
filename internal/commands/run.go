@@ -8,6 +8,7 @@ import (
 
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/config"
+	"github.com/svngoku/hermes-cli/internal/pidfile"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
 
@@ -95,6 +96,10 @@ func Run(ctx *app.AppContext, args []string) error {
 	if err := serveCmd.Start(); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
+	recordDaemon(ctx, serveCfg, serveCmd.Process.Pid)
+	if !*daemon {
+		defer pidfile.Remove(serveCfg.Port)
+	}
 	fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Server started (pid=%d)", serveCmd.Process.Pid)))
 
 	base := fmt.Sprintf("http://127.0.0.1:%d", *port)
@@ -126,6 +131,7 @@ func Run(ctx *app.AppContext, args []string) error {
 		return waitForServer(ctx, serveCmd)
 	}
 
+	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Stop with: hermes stop --port %d", *port)))
 	return nil
 }
 

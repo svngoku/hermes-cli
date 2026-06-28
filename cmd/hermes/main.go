@@ -122,6 +122,8 @@ var commandRegistry = map[string]CommandFunc{
 	"verify":  commands.Verify,
 	"studio":  commands.Studio,
 	"run":     commands.Run,
+	"stop":    commands.Stop,
+	"status":  commands.Status,
 }
 
 func dispatch(cmd string, ctx *app.AppContext, args []string) error {
@@ -155,6 +157,8 @@ func printUsage() {
 	fmt.Println("  verify    Verify server is responding")
 	fmt.Println("  studio    Launch vllm-studio controller")
 	fmt.Println("  run       Run full pipeline (doctor → install → serve → verify)")
+	fmt.Println("  stop      Stop a background engine daemon")
+	fmt.Println("  status    List recorded engine daemons")
 	fmt.Println("  version   Show version information")
 	fmt.Println("  help      Show this help message")
 	fmt.Println()
@@ -173,6 +177,7 @@ func printUsage() {
 	fmt.Println("  hermes install --install sglang")
 	fmt.Println("  hermes serve --engine vllm --model meta-llama/Llama-3-8B --tp 4")
 	fmt.Println("  hermes run --engine sglang --model mymodel --daemon")
+	fmt.Println("  hermes stop --port 30000")
 	fmt.Println()
 	fmt.Println("For command-specific help:")
 	fmt.Println("  hermes <command> --help")

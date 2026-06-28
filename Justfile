@@ -22,14 +22,14 @@ clean:
     rm -rf bin/
     go clean
 
-# Run the test suite
+# Run the test suite with the race detector
 test:
-    go test -v ./...
+    go test -race ./...
 
-# Vet, plus golangci-lint when available
+# Vet, plus golangci-lint (with .golangci.yml) when available
 lint:
     go vet ./...
-    @command -v golangci-lint >/dev/null 2>&1 && golangci-lint run || echo "golangci-lint not installed"
+    @command -v golangci-lint >/dev/null 2>&1 && golangci-lint run --config .golangci.yml || echo "golangci-lint not installed"
 
 # Format all Go code
 fmt:

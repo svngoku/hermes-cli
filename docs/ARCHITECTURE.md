@@ -44,11 +44,12 @@ flowchart TD
         engine[internal/engine<br/>Engine interface: sglang, vllm]
     end
     subgraph Runtime["Runtime / orchestration"]
-        commands[internal/commands<br/>doctor, install, serve, verify, studio, run]
+        commands[internal/commands<br/>doctor, install, serve, verify, studio, run, stop, status]
         app[internal/app<br/>AppContext, global wiring]
     end
     subgraph Edges["Impure edges (I/O, processes)"]
         execx[internal/execx<br/>process execution]
+        pidfile[internal/pidfile<br/>daemon registry]
     end
     subgraph UI["Presentation"]
         ui[internal/ui<br/>Lip Gloss styles]
@@ -60,11 +61,11 @@ flowchart TD
     commands --> app
     commands --> engine
     commands --> execx
+    commands --> pidfile
     commands --> ui
     commands --> tui
     engine --> config
     engine --> execx
-    app --> config
     tui --> ui
 ```
 
@@ -126,11 +127,35 @@ sequenceDiagram
 
 ---
 
-## 5. Golden Principles (mechanical, linter-enforced)
+## 5. Daemon Lifecycle
+
+Daemon and foreground launches both record a `pidfile.Record`
+(`~/.cache/hermes/daemons/<port>.json`) so background engines can be managed
+after the CLI exits. Foreground runs remove their record on shutdown; daemons
+keep it until `hermes stop` or the process is found dead by `hermes status`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> recorded: serve/run start
+    recorded --> running: pid alive
+    running --> stopped: hermes stop (SIGTERM -pgid)
+    running --> stale: process died
+    stale --> [*]: status prunes record
+    stopped --> [*]: record removed
+```
+
+- `hermes stop --port N` sends SIGTERM to the process group (negative pid) so
+  engine worker children are terminated too, then removes the record.
+- `hermes status` prunes records whose pid is no longer alive, then probes
+  `/health` for each survivor.
+
+---
+
+## 6. Golden Principles (mechanical, linter-enforced)
 
 | ID | Principle | Enforcement |
 |----|-----------|-------------|
-| **GP-1** | **Dependency direction is inward.** `config` imports nothing internal; `engine` imports only `config`/`execx`; only `cmd/hermes` wires the graph. | `go vet` + import-cycle check; future depguard rule |
+| **GP-1** | **Dependency direction is inward.** `config` imports nothing internal; `engine` imports only `config`/`execx`; only `cmd/hermes` wires the graph. | depguard rules in `.golangci.yml` + `go vet` |
 | **GP-2** | **Entry points only wire.** `cmd/hermes` contains routing and flag parsing, never business logic. | Review + size budget |
 | **GP-3** | **Errors carry context.** Wrap with `fmt.Errorf("...: %w", err)`; never discard errors silently (`_ =`) outside best-effort cleanup. | `go vet`, `errcheck` (golangci-lint) |
 | **GP-4** | **No secrets in code.** Tokens, keys, and hosts come from flags/env, never literals. | trufflehog secret scan in CI |
@@ -139,7 +164,7 @@ sequenceDiagram
 
 ---
 
-## 6. Technology Preferences
+## 7. Technology Preferences
 
 - **Language:** Go 1.24+ (`CGO_ENABLED=0`, static binary).
 - **CLI:** custom subcommand router (no Cobra) — keep dependencies minimal.
@@ -150,7 +175,7 @@ sequenceDiagram
 
 ---
 
-## 7. Where Decisions Live
+## 8. Where Decisions Live
 
 - Architectural decisions: [`design-docs/index.md`](design-docs/index.md)
 - Code conventions: [`DESIGN.md`](DESIGN.md)

@@ -17,6 +17,7 @@
 | Plan | Area | Completed |
 |------|------|-----------|
 | [Correctness fixes + initial tests](exec-plans/completed/2026-06-28-correctness-and-tests.md) | commands, app, engine, execx | 2026-06-28 |
+| [Daemon mgmt + verify fix + lint tooling](exec-plans/completed/2026-06-28-daemon-mgmt-and-tooling.md) | pidfile, commands, ci | 2026-06-28 |
 
 ---
 

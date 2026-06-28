@@ -9,10 +9,11 @@
 | Domain | Grade | Notes |
 |--------|-------|-------|
 | `cmd/hermes` (entry/routing) | C | `realMain()` pattern; exit codes via `app.ExitError`. Still untested. |
-| `internal/commands` | C | Process-lifecycle bugs fixed; still no command-level tests. |
+| `internal/commands` | C+ | Process-lifecycle fixed; `stop`/`status` added; still no command-level tests. |
 | `internal/engine` | B | `ServeCommand` + arg splitting covered by tests. |
-| `internal/config` | B | Default config helpers covered by tests. |
+| `internal/config` | B | Default config helpers covered by tests; dead `DoctorConfig` removed. |
 | `internal/execx` | B | `Run`/`RunWithTimeout`/`CommandExists` covered by tests. |
+| `internal/pidfile` | B | New daemon registry; write/read/list/remove/alive covered by tests. |
 | `internal/ui` + `ui/tui` | C | Presentation only. |
 
 ## 2. Tech Debt Tracker
@@ -28,10 +29,10 @@
 | TD-7 | commands | Foreground `run` could not stop the engine on Ctrl+C. | High | fixed |
 | TD-8 | engine | `--extra-args` split naively; sglang ignored it entirely. | Med | fixed |
 | TD-9 | execx | No per-probe timeout; a hung tool could block `doctor`. | Med | fixed |
-| TD-10 | commands | No `hermes stop`/`status`; daemons have no PID registry. | Med | open |
-| TD-11 | commands | `verify --chat` hardcodes model `"default"`; should read `/v1/models`. | Low | open |
-| TD-12 | ci | No `.golangci.yml`; no `go test -race`; no depguard for GP-1. | Low | open |
-| TD-13 | config | Typed config structs (`DoctorConfig`, etc.) largely unused. | Low | open |
+| TD-10 | commands | No `hermes stop`/`status`; daemons had no PID registry. | Med | fixed |
+| TD-11 | commands | `verify --chat` hardcoded model `"default"`; now resolves from `/v1/models`. | Low | fixed |
+| TD-12 | ci | No `.golangci.yml`; no `go test -race`; no depguard for GP-1. | Low | fixed |
+| TD-13 | config | Typed config structs largely unused. `DoctorConfig` removed; Install/Verify/Studio retained as documented+tested default surface. | Low | fixed |
 
 ## 3. Grading Rubric
 
@@ -53,7 +54,6 @@ flowchart LR
 
 ## 4. Path to A (next steps)
 
-1. Add command-level tests (doctor report logic, verify status, install-mode parsing).
-2. Add `hermes stop`/`status` with a PID registry (TD-10).
-3. Make `verify --chat` resolve the model from `/v1/models` (TD-11).
-4. Add `.golangci.yml`, `go test -race`, and a depguard rule enforcing GP-1 (TD-12).
+1. Add command-level tests (doctor report logic, verify status, stop/status with a fake pidfile dir, install-mode parsing).
+2. Add a `hermes logs`/`hermes restart` convenience (follow-up to the daemon registry).
+3. Add a `depguard` test gate in CI once golangci-lint v2 is pinned, and expand deny rules if new layers appear.

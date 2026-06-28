@@ -1,0 +1,93 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - gofmt
+    - goimports
+    - depguard
+
+  settings:
+    depguard:
+      # GP-1 (see docs/ARCHITECTURE.md §5): dependency direction is inward.
+      # Each rule denies the internal package prefix for a layer, except for
+      # the explicitly allowed dependents. list-mode: lax means a more-specific
+      # allow entry wins over the deny prefix.
+      rules:
+        config:
+          list-mode: lax
+          files:
+            - "**/internal/config/*.go"
+          allow:
+            - $gostd
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "config is the innermost layer; it must not import other internal packages"
+        execx:
+          list-mode: lax
+          files:
+            - "**/internal/execx/*.go"
+          allow:
+            - $gostd
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "execx is a leaf edge package; it must not import internal packages"
+        pidfile:
+          list-mode: lax
+          files:
+            - "**/internal/pidfile/*.go"
+          allow:
+            - $gostd
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "pidfile is a leaf package; it must not import internal packages"
+        app:
+          list-mode: lax
+          files:
+            - "**/internal/app/*.go"
+          allow:
+            - $gostd
+            - "github.com/charmbracelet/"
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "app context must not depend on domain or command packages"
+        ui:
+          list-mode: lax
+          files:
+            - "**/internal/ui/**/*.go"
+          allow:
+            - $gostd
+            - "github.com/charmbracelet/"
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "presentation packages must not depend on domain logic"
+        engine:
+          list-mode: lax
+          files:
+            - "**/internal/engine/*.go"
+          allow:
+            - $gostd
+            - "github.com/svngoku/hermes-cli/internal/config"
+            - "github.com/svngoku/hermes-cli/internal/execx"
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "engine may only depend on config and execx (GP-1)"
+
+  exclusions:
+    presets:
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - "internal/ui/tui"
+      - "assets"

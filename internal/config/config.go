@@ -27,11 +27,6 @@ type ServeConfig struct {
 	LogFile   string
 }
 
-type DoctorConfig struct {
-	JSON   bool
-	Strict bool
-}
-
 type InstallConfig struct {
 	Mode  InstallMode
 	Check bool

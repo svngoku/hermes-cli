@@ -9,12 +9,31 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/config"
 	"github.com/svngoku/hermes-cli/internal/engine"
+	"github.com/svngoku/hermes-cli/internal/pidfile"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
+
+// recordDaemon persists a pid record for a started engine process. Best-effort:
+// a failure to record does not stop the server.
+func recordDaemon(ctx *app.AppContext, cfg config.ServeConfig, pid int) {
+	rec := pidfile.Record{
+		PID:       pid,
+		Engine:    string(cfg.Engine),
+		Model:     cfg.Model,
+		Host:      cfg.Host,
+		Port:      cfg.Port,
+		LogFile:   cfg.LogFile,
+		StartedAt: time.Now(),
+	}
+	if err := pidfile.Write(rec); err != nil {
+		ctx.Logger.Warn("failed to record daemon", "error", err)
+	}
+}
 
 func Serve(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
@@ -93,8 +112,10 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to start daemon: %w", err)
 		}
+		recordDaemon(ctx, cfg, cmd.Process.Pid)
 		fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Daemon started (pid=%d)", cmd.Process.Pid)))
 		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Endpoint: http://%s:%d", cfg.Host, cfg.Port)))
+		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Stop with: hermes stop --port %d", cfg.Port)))
 		if cfg.LogFile != "" {
 			fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Logs: tail -f %s", cfg.LogFile)))
 		}
@@ -116,6 +137,9 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
+
+	recordDaemon(ctx, cfg, cmd.Process.Pid)
+	defer pidfile.Remove(cfg.Port)
 
 	fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Server started (pid=%d)", cmd.Process.Pid)))
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Endpoint: http://%s:%d", cfg.Host, cfg.Port)))
