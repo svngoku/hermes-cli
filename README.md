@@ -54,10 +54,10 @@ hermes doctor
 hermes install --install both
 
 # Start server
-hermes serve --engine sglang --model meta-llama/Llama-3-8B --tp 4
+hermes serve --engine sglang --model meta-llama/Llama-3-8B --tp 1
 
 # Or run the full pipeline
-hermes run --engine vllm --model mistralai/Mistral-7B-v0.1 --tp 4
+hermes run --engine vllm --model mistralai/Mistral-7B-v0.1 --tp 1
 ```
 
 ## Usage Examples
@@ -92,13 +92,16 @@ hermes install --check
 
 ```bash
 # Start sglang server
-hermes serve --engine sglang --model meta-llama/Llama-3-8B --tp 4
+hermes serve --engine sglang --model meta-llama/Llama-3-8B --tp 1
 
 # Start vllm server with custom port
 hermes serve --engine vllm --model mistralai/Mistral-7B-v0.1 --port 8080
 
 # Daemon mode (background)
 hermes serve --engine vllm --model Qwen/Qwen3-8B --daemon
+
+# Multi-GPU: select specific devices and set tensor parallel
+hermes serve --engine vllm --model Qwen/Qwen3-8B --cuda-devices 0,1,2,3 --tp 4
 
 # With extra engine arguments
 hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
@@ -132,10 +135,13 @@ hermes verify --chat
 
 ```bash
 # Complete pipeline: doctor → install → serve → verify
-hermes run --engine sglang --model meta-llama/Llama-3-8B --tp 4
+hermes run --engine sglang --model meta-llama/Llama-3-8B --tp 1
 
 # Daemon mode
 hermes run --engine vllm --model Qwen/Qwen3-8B --daemon
+
+# Multi-GPU with CUDA device selection
+hermes run --engine vllm --model Qwen/Qwen3-8B --cuda-devices 0,1 --tp 2
 
 # Skip verification
 hermes run --engine sglang --model mymodel --no-verify
@@ -162,6 +168,8 @@ internal/
   config/                # Typed config structs
   engine/                # Engine interface (sglang, vllm)
   execx/                 # Process execution helpers
+  gpu/                   # GPU inventory (nvidia-smi) + CUDA device parsing
+  pidfile/               # Daemon registry (PID records)
   ui/                    # Lip Gloss styles
   ui/tui/                # Bubble Tea components (spinner, steps, forms)
 ```
@@ -199,7 +207,7 @@ curl -X POST http://localhost:30000/v1/chat/completions \
 The original Bash implementation is still available:
 
 ```bash
-./hermes.sh --engine sglang --model meta-llama/Llama-3-8B --tp 4
+./hermes.sh --engine sglang --model meta-llama/Llama-3-8B --tp 1
 ```
 
 ## Development

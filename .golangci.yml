@@ -71,6 +71,16 @@ linters:
           deny:
             - pkg: "github.com/svngoku/hermes-cli/internal/"
               desc: "presentation packages must not depend on domain logic"
+        gpu:
+          list-mode: lax
+          files:
+            - "**/internal/gpu/*.go"
+          allow:
+            - $gostd
+            - "github.com/svngoku/hermes-cli/internal/execx"
+          deny:
+            - pkg: "github.com/svngoku/hermes-cli/internal/"
+              desc: "gpu is a leaf edge package; it may only import execx for nvidia-smi probes"
         engine:
           list-mode: lax
           files:

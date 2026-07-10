@@ -37,8 +37,12 @@ flowchart TD
 |---------|-----------|----------|
 | `uv` missing | `execx.CommandExists` | Auto-install via official script, re-check. |
 | Engine import fails | `CheckInstalled` exit code | Report "not installed", offer install path. |
-| Port in use | pre-flight port check | Refuse to start, tell operator the port. |
-| Engine crashes on boot | non-zero exit / stderr | Print crash reason inline, exit non-zero. |
+| Port in use | `assertPortAvailable` via `net.Listen` | Refuse to start before engine launch, tell operator the port. |
+| TP > GPU count | `gpu.Count` + `config.ValidateTP` | Refuse to start, report visible GPU count and requested TP. |
+| Invalid `--cuda-devices` | `gpu.ParseCUDADevices` | Reject duplicates, non-integer, negative IDs before launch. |
+| Engine crashes on boot | `pollProcessExit` (WNOHANG) + log tail | Print last 8KB of engine log inline, exit non-zero. |
+| Daemon boot timeout | `waitForBoot` exceeds `--boot-timeout` | Terminate process group, print crash reason, exit non-zero. |
+| Foreground run interrupted | `ownershipGuard` on SIGINT | Remove pidfile record, reap process group, exit cleanly. |
 | Corrupt state.json | JSON unmarshal error | Reset to empty state, continue. |
 
 ## 4. Rollback Policy

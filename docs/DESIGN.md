@@ -21,6 +21,8 @@ flowchart LR
     subgraph internal
         config --> engine
         execx --> engine
+        execx --> gpu
+        gpu --> commands
         engine --> commands
         app --> commands
         ui --> commands
@@ -32,6 +34,8 @@ flowchart LR
 - One command per file in `internal/commands` (`serve.go`, `run.go`, ...).
 - One engine implementation per file in `internal/engine` (`sglang.go`, `vllm.go`).
 - Shared process helpers live only in `internal/execx`.
+- GPU inventory and CUDA device parsing live in `internal/gpu` (leaf edge package,
+  imports only `execx`).
 
 ## 3. Command Pattern
 
@@ -49,6 +53,11 @@ func Serve(ctx *app.AppContext, args []string) error {
 ```
 
 - Flags are parsed with the stdlib `flag` package (no Cobra).
+- Preflight validation runs before engine launch: `gpu.Count` + `config.ValidateTP`
+  for tensor-parallel safety, `assertPortAvailable` for port conflicts,
+  `gpu.ParseCUDADevices` for `--cuda-devices`.
+- Daemon launches use `waitForBoot` to poll readiness and detect early crash via
+  `pollProcessExit` (WNOHANG); on failure, `terminateAndReap` cleans up.
 - All user-facing output goes through `ui` helpers (`ui.Ok`, `ui.Warn`, `ui.Step`).
 - All process work goes through `execx.Run` / `execx.Start` with the shared context.
 
@@ -86,7 +95,7 @@ flowchart TD
 
 ## 7. Testing
 
-- Tests live beside code as `*_test.go` (none yet — see QUALITY_SCORE.md).
-- Prefer table-driven tests for `engine.ServeCommand` arg construction and
-  `config` validation — they are pure and cheap to cover.
-- `just test` runs `go test -v ./...`.
+- Tests live beside code as `*_test.go`.
+- Prefer table-driven tests for `engine.ServeCommand` arg construction,
+  `config` validation, `gpu` parsing, and command characterization.
+- `just test` runs `go test -race ./...`.

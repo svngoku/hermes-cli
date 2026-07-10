@@ -49,6 +49,7 @@ flowchart TD
     end
     subgraph Edges["Impure edges (I/O, processes)"]
         execx[internal/execx<br/>process execution]
+        gpu[internal/gpu<br/>GPU inventory probes]
         pidfile[internal/pidfile<br/>daemon registry]
     end
     subgraph UI["Presentation"]
@@ -61,17 +62,20 @@ flowchart TD
     commands --> app
     commands --> engine
     commands --> execx
+    commands --> gpu
     commands --> pidfile
     commands --> ui
     commands --> tui
     engine --> config
     engine --> execx
+    gpu --> execx
     tui --> ui
 ```
 
 **Dependency direction rule:** arrows point from more-volatile to more-stable.
 `config` depends on nothing internal. `engine` depends only on `config` and
-`execx`. `cmd/hermes` is the only package allowed to wire everything together.
+`execx`. `gpu` depends only on `execx`. `cmd/hermes` is the only package
+allowed to wire everything together.
 
 ---
 
@@ -108,21 +112,29 @@ Adding a new engine means implementing `Engine` and registering it in
 sequenceDiagram
     actor U as Operator
     participant C as commands/serve
+    participant G as gpu.Count
+    participant P as port preflight
     participant E as engine.Engine
     participant X as execx
-    participant P as Engine process
-    participant V as commands/verify
+    participant B as boot wait
+    participant Engine as Engine process
 
     U->>C: hermes serve --engine vllm --model ...
+    C->>G: validate TP vs GPU count
+    C->>P: assertPortAvailable(port)
     C->>E: ServeCommand(cfg)
     E-->>C: (bin, args)
     C->>X: Run / Start(bin, args)
-    X->>P: spawn subprocess
-    P-->>X: stdout/stderr stream
-    C->>V: poll /health (optional)
-    V->>P: HTTP GET /health
-    P-->>V: 200 OK
-    V-->>U: server ready
+    X->>Engine: spawn subprocess
+    alt daemon mode
+        C->>B: waitForBoot(readiness, timeout)
+        B->>Engine: poll /health
+        Engine-->>B: 200 OK
+        B-->>U: server ready
+        Note over B: if process dies, tail log + exit
+    else foreground mode
+        Engine-->>X: stdout/stderr stream
+    end
 ```
 
 ---
@@ -148,6 +160,8 @@ stateDiagram-v2
   engine worker children are terminated too, then removes the record.
 - `hermes status` prunes records whose pid is no longer alive, then probes
   `/health` for each survivor.
+- Foreground `hermes run` installs an ownership guard that cleans up the pidfile
+  on Ctrl+C or unexpected exit, preventing orphaned daemon records.
 
 ---
 
