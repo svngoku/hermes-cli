@@ -10,6 +10,7 @@ import (
 
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/execx"
+	"github.com/svngoku/hermes-cli/internal/gpu"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
 
@@ -209,16 +210,17 @@ func checkCUDA(ctx *app.AppContext, jsonOut bool) CheckResult {
 func checkGPUs(ctx *app.AppContext, jsonOut bool) CheckResult {
 	check := CheckResult{Name: "gpu_count"}
 
-	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "nvidia-smi", "--query-gpu=count", "--format=csv,noheader")
-	if result.ExitCode != 0 {
+	count, err := gpu.Count(ctx.Ctx)
+	if err != nil {
 		check.Status = StatusSkipped
-		check.Message = "Could not query GPU count"
+		check.Message = fmt.Sprintf("Could not query GPU count: %v", err)
+		if !jsonOut {
+			fmt.Fprintln(ctx.Stdout, ui.Warn(check.Message))
+		}
 		return check
 	}
 
-	lines := strings.Split(strings.TrimSpace(result.Stdout), "\n")
-	count := len(lines)
-	if count > 0 && lines[0] != "" {
+	if count > 0 {
 		check.Status = StatusOK
 		check.Message = fmt.Sprintf("%d GPU(s) available", count)
 		if !jsonOut {

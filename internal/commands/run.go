@@ -16,7 +16,7 @@ func Run(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	engineName := fs.String("engine", "", "Engine: sglang|vllm (required)")
 	model := fs.String("model", "", "Model path or HuggingFace repo (required)")
-	tp := fs.Int("tp", 4, "Tensor parallel size")
+	tp := fs.Int("tp", 1, "Tensor parallel size")
 	host := fs.String("host", "0.0.0.0", "Bind host")
 	port := fs.Int("port", 30000, "Bind port")
 	daemon := fs.Bool("daemon", false, "Run in daemon mode")
@@ -80,6 +80,10 @@ func Run(ctx *app.AppContext, args []string) error {
 		Daemon:    true, // run engine in the background while we poll and verify
 		ExtraArgs: *extraArgs,
 		LogFile:   ctx.LogFile,
+	}
+
+	if err := validateTensorParallel(ctx, serveCfg.TP); err != nil {
+		return err
 	}
 
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Starting %s with model %s", serveCfg.Engine, serveCfg.Model)))

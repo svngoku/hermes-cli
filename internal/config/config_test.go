@@ -7,14 +7,63 @@ func TestDefaultServeConfig(t *testing.T) {
 	if c.Engine != EngineSGLang {
 		t.Errorf("Engine = %q, want sglang", c.Engine)
 	}
-	if c.TP != 4 {
-		t.Errorf("TP = %d, want 4", c.TP)
+	if c.TP != 1 {
+		t.Errorf("TP = %d, want 1", c.TP)
 	}
 	if c.Host != "0.0.0.0" {
 		t.Errorf("Host = %q, want 0.0.0.0", c.Host)
 	}
 	if c.Port != 30000 {
 		t.Errorf("Port = %d, want 30000", c.Port)
+	}
+}
+
+func TestValidateTP(t *testing.T) {
+	tests := []struct {
+		name     string
+		tp       int
+		gpuCount int
+		wantErr  bool
+	}{
+		{
+			name:     "zero tensor parallel size",
+			tp:       0,
+			gpuCount: 4,
+			wantErr:  true,
+		},
+		{
+			name:     "one tensor parallel worker with no GPUs",
+			tp:       1,
+			gpuCount: 0,
+			wantErr:  true,
+		},
+		{
+			name:     "tensor parallel size exceeds GPUs",
+			tp:       4,
+			gpuCount: 2,
+			wantErr:  true,
+		},
+		{
+			name:     "tensor parallel size matches GPUs",
+			tp:       2,
+			gpuCount: 2,
+			wantErr:  false,
+		},
+		{
+			name:     "unknown GPU count",
+			tp:       2,
+			gpuCount: -1,
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateTP(tt.tp, tt.gpuCount)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateTP(%d, %d) error = %v, wantErr %t", tt.tp, tt.gpuCount, err, tt.wantErr)
+			}
+		})
 	}
 }
 

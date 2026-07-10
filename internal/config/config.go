@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 type Engine string
 
 const (
@@ -48,10 +50,20 @@ type StudioConfig struct {
 func DefaultServeConfig() ServeConfig {
 	return ServeConfig{
 		Engine: EngineSGLang,
-		TP:     4,
+		TP:     1,
 		Host:   "0.0.0.0",
 		Port:   30000,
 	}
+}
+
+func ValidateTP(tp, gpuCount int) error {
+	if tp < 1 {
+		return fmt.Errorf("tensor parallel size must be at least 1 (got %d; available GPU count: %d)", tp, gpuCount)
+	}
+	if gpuCount >= 0 && tp > gpuCount {
+		return fmt.Errorf("tensor parallel size %d exceeds available GPU count %d", tp, gpuCount)
+	}
+	return nil
 }
 
 func DefaultInstallConfig() InstallConfig {

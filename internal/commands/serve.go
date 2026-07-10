@@ -14,6 +14,7 @@ import (
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/config"
 	"github.com/svngoku/hermes-cli/internal/engine"
+	"github.com/svngoku/hermes-cli/internal/gpu"
 	"github.com/svngoku/hermes-cli/internal/pidfile"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
@@ -39,7 +40,7 @@ func Serve(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	engineName := fs.String("engine", "sglang", "Engine: sglang|vllm")
 	model := fs.String("model", "", "Model path or HuggingFace repo")
-	tp := fs.Int("tp", 4, "Tensor parallel size")
+	tp := fs.Int("tp", 1, "Tensor parallel size")
 	host := fs.String("host", "0.0.0.0", "Bind host")
 	port := fs.Int("port", 30000, "Bind port")
 	daemon := fs.Bool("daemon", false, "Run in daemon mode")
@@ -80,7 +81,20 @@ func Serve(ctx *app.AppContext, args []string) error {
 		LogFile:   ctx.LogFile,
 	}
 
+	if err := validateTensorParallel(ctx, cfg.TP); err != nil {
+		return err
+	}
+
 	return runServe(ctx, cfg)
+}
+
+func validateTensorParallel(ctx *app.AppContext, tp int) error {
+	gpuCount, err := gpu.Count(ctx.Ctx)
+	if err != nil {
+		ctx.Logger.Warn("could not query GPU count; skipping tensor parallel capacity validation", "error", err)
+		gpuCount = -1
+	}
+	return config.ValidateTP(tp, gpuCount)
 }
 
 func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
