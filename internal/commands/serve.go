@@ -45,6 +45,7 @@ func Serve(ctx *app.AppContext, args []string) error {
 	host := fs.String("host", "0.0.0.0", "Bind host")
 	port := fs.Int("port", 30000, "Bind port")
 	daemon := fs.Bool("daemon", false, "Run in daemon mode")
+	bootTimeout := fs.Int("boot-timeout", 120, "Daemon boot timeout in seconds")
 	cudaDevices := fs.String("cuda-devices", "", "CUDA_VISIBLE_DEVICES list (e.g. 0,1); empty inherits environment")
 	extraArgs := fs.String("extra-args", "", "Additional engine arguments")
 	fs.Usage = func() {
@@ -60,6 +61,9 @@ func Serve(ctx *app.AppContext, args []string) error {
 
 	if *model == "" {
 		return fmt.Errorf("--model is required")
+	}
+	if *bootTimeout <= 0 {
+		return fmt.Errorf("--boot-timeout must be greater than zero")
 	}
 
 	var eng config.Engine
@@ -93,7 +97,7 @@ func Serve(ctx *app.AppContext, args []string) error {
 		return err
 	}
 
-	return runServe(ctx, cfg)
+	return runServe(ctx, cfg, time.Duration(*bootTimeout)*time.Second)
 }
 
 func validateTensorParallel(ctx *app.AppContext, cfg config.ServeConfig) error {
@@ -113,7 +117,7 @@ func validateTensorParallel(ctx *app.AppContext, cfg config.ServeConfig) error {
 	return config.ValidateTP(cfg.TP, gpuCount)
 }
 
-func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
+func runServe(ctx *app.AppContext, cfg config.ServeConfig, bootTimeout time.Duration) error {
 	fmt.Fprintln(ctx.Stdout, ui.Banner())
 	fmt.Fprintln(ctx.Stdout, ui.Step(fmt.Sprintf("Starting %s server...", cfg.Engine)))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
@@ -150,6 +154,12 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 			return fmt.Errorf("failed to start daemon: %w", err)
 		}
 		recordDaemon(ctx, cfg, cmd.Process.Pid)
+		base := fmt.Sprintf("http://127.0.0.1:%d", cfg.Port)
+		if err := waitForBoot(ctx.Ctx, cmd, base, bootTimeout, cfg.LogFile); err != nil {
+			_ = pidfile.Remove(cfg.Port)
+			terminateAndReap(cmd)
+			return err
+		}
 		fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Daemon started (pid=%d)", cmd.Process.Pid)))
 		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Endpoint: http://%s:%d", cfg.Host, cfg.Port)))
 		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Stop with: hermes stop --port %d", cfg.Port)))

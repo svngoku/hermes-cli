@@ -3,7 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/svngoku/hermes-cli/internal/app"
@@ -39,6 +38,9 @@ func Run(ctx *app.AppContext, args []string) error {
 
 	if *engineName == "" || *model == "" {
 		return fmt.Errorf("--engine and --model are required")
+	}
+	if *readinessTimeout <= 0 {
+		return fmt.Errorf("--readiness-timeout must be greater than zero")
 	}
 
 	var eng config.Engine
@@ -123,9 +125,17 @@ func Run(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout)
 	fmt.Fprintln(ctx.Stdout, ui.Step("Phase 4: Readiness"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
-	if err := waitForReadiness(ctx, base, time.Duration(*readinessTimeout)*time.Second); err != nil {
+	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf(
+		"Waiting for server at %s (timeout: %s)",
+		base,
+		time.Duration(*readinessTimeout)*time.Second,
+	)))
+	if err := waitForBoot(ctx.Ctx, serveCmd, base, time.Duration(*readinessTimeout)*time.Second, serveCfg.LogFile); err != nil {
+		_ = pidfile.Remove(serveCfg.Port)
+		terminateAndReap(serveCmd)
 		return err
 	}
+	fmt.Fprintln(ctx.Stdout, ui.Ok("Server is ready"))
 
 	if !*noVerify {
 		fmt.Fprintln(ctx.Stdout)
@@ -196,33 +206,4 @@ func runInstallPhase(ctx *app.AppContext, mode config.InstallMode) error {
 	}
 
 	return Install(ctx, []string{"--install", string(mode)})
-}
-
-func waitForReadiness(ctx *app.AppContext, base string, timeout time.Duration) error {
-	client := &http.Client{Timeout: 5 * time.Second}
-	deadline := time.Now().Add(timeout)
-	checkInterval := 2 * time.Second
-
-	endpoints := []string{"/v1/models", "/health"}
-
-	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Waiting for server at %s (timeout: %s)", base, timeout)))
-
-	for time.Now().Before(deadline) {
-		for _, endpoint := range endpoints {
-			resp, err := client.Get(base + endpoint)
-			if err == nil && resp.StatusCode == http.StatusOK {
-				resp.Body.Close()
-				fmt.Fprintln(ctx.Stdout, ui.Ok("Server is ready"))
-				return nil
-			}
-			if resp != nil {
-				resp.Body.Close()
-			}
-		}
-		time.Sleep(checkInterval)
-		fmt.Fprint(ctx.Stdout, ".")
-	}
-
-	fmt.Fprintln(ctx.Stdout)
-	return fmt.Errorf("timeout waiting for server readiness")
 }
