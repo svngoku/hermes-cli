@@ -88,6 +88,10 @@ func Run(ctx *app.AppContext, args []string) error {
 
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Starting %s with model %s", serveCfg.Engine, serveCfg.Model)))
 
+	if err := assertPortAvailable(serveCfg.Host, serveCfg.Port); err != nil {
+		return err
+	}
+
 	serveCmd, serveLog, err := startEngine(ctx, serveCfg)
 	if err != nil {
 		return err

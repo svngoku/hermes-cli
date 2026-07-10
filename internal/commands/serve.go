@@ -112,6 +112,10 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 	}
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 
+	if err := assertPortAvailable(cfg.Host, cfg.Port); err != nil {
+		return err
+	}
+
 	cmd, logFile, err := startEngine(ctx, cfg)
 	if err != nil {
 		return err
