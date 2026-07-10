@@ -109,6 +109,24 @@ func validateTensorParallel(ctx *app.AppContext, cfg config.ServeConfig) error {
 		return config.ValidateTP(cfg.TP, gpuCount)
 	}
 
+	if inherited, present := os.LookupEnv("CUDA_VISIBLE_DEVICES"); present {
+		inherited = strings.TrimSpace(inherited)
+		if inherited == "" || inherited == "-1" {
+			return config.ValidateTP(cfg.TP, 0)
+		}
+
+		gpuCount, _, err := gpu.ParseCUDADevices(inherited)
+		if err != nil {
+			ctx.Logger.Warn(
+				"unsupported inherited CUDA_VISIBLE_DEVICES; skipping tensor parallel capacity validation",
+				"value", inherited,
+				"error", err,
+			)
+			return config.ValidateTP(cfg.TP, -1)
+		}
+		return config.ValidateTP(cfg.TP, gpuCount)
+	}
+
 	gpuCount, err := gpu.Count(ctx.Ctx)
 	if err != nil {
 		ctx.Logger.Warn("could not query GPU count; skipping tensor parallel capacity validation", "error", err)
@@ -154,7 +172,7 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig, bootTimeout time.Dura
 			return fmt.Errorf("failed to start daemon: %w", err)
 		}
 		recordDaemon(ctx, cfg, cmd.Process.Pid)
-		base := fmt.Sprintf("http://127.0.0.1:%d", cfg.Port)
+		base := readinessBaseURL(cfg.Host, cfg.Port)
 		if err := waitForBoot(ctx.Ctx, cmd, base, bootTimeout, cfg.LogFile); err != nil {
 			_ = pidfile.Remove(cfg.Port)
 			terminateAndReap(cmd)

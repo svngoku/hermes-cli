@@ -98,3 +98,56 @@ func TestStartEngineEmptyCUDADevicesUsesNaturalInheritance(t *testing.T) {
 		t.Errorf("startEngine() Env = %q, want nil for natural inheritance", cmd.Env)
 	}
 }
+
+func TestValidateTensorParallelInheritedCUDADevices(t *testing.T) {
+	tests := []struct {
+		name      string
+		inherited string
+		tp        int
+		wantErr   bool
+	}{
+		{name: "one inherited GPU cannot satisfy TP2", inherited: "0", tp: 2, wantErr: true},
+		{name: "two inherited GPUs satisfy TP2", inherited: "0,1", tp: 2},
+		{name: "empty inherited visibility means zero GPUs", inherited: "", tp: 1, wantErr: true},
+		{name: "whitespace inherited visibility means zero GPUs", inherited: " \t ", tp: 1, wantErr: true},
+		{name: "disabled inherited visibility means zero GPUs", inherited: "-1", tp: 1, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("CUDA_VISIBLE_DEVICES", tt.inherited)
+			testCtx := newTestAppContext(t)
+			cfg := config.ServeConfig{TP: tt.tp}
+
+			err := validateTensorParallel(testCtx.AppContext, cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateTensorParallel() error = %v, wantErr %t", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateTensorParallelUnsupportedInheritedCUDADevices(t *testing.T) {
+	t.Setenv("CUDA_VISIBLE_DEVICES", "GPU-uuid")
+	testCtx := newTestAppContext(t)
+
+	if err := validateTensorParallel(testCtx.AppContext, config.ServeConfig{TP: 2}); err != nil {
+		t.Fatalf("validateTensorParallel() error = %v, want nil for unsupported inherited format", err)
+	}
+	if !strings.Contains(testCtx.logs.String(), "unsupported inherited CUDA_VISIBLE_DEVICES") {
+		t.Errorf("logs = %q, want unsupported inherited CUDA_VISIBLE_DEVICES warning", testCtx.logs)
+	}
+}
+
+func TestValidateTensorParallelExplicitCUDADevicesOverrideEnvironment(t *testing.T) {
+	t.Setenv("CUDA_VISIBLE_DEVICES", "0")
+	testCtx := newTestAppContext(t)
+	cfg := config.ServeConfig{
+		TP:          2,
+		CUDADevices: "2,3",
+	}
+
+	if err := validateTensorParallel(testCtx.AppContext, cfg); err != nil {
+		t.Fatalf("validateTensorParallel() error = %v, want explicit devices to override inherited environment", err)
+	}
+}

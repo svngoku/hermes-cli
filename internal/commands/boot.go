@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -19,6 +20,16 @@ const (
 	bootRetryDelay   = 100 * time.Millisecond
 	bootProbeTimeout = time.Second
 )
+
+func readinessBaseURL(host string, port int) string {
+	switch host {
+	case "", "0.0.0.0":
+		host = "127.0.0.1"
+	case "::", "[::]":
+		host = "::1"
+	}
+	return "http://" + net.JoinHostPort(host, fmt.Sprint(port))
+}
 
 // tailFile returns up to maxBytes from the end of path. It is best-effort so
 // boot errors are never hidden by a missing or unreadable log file.

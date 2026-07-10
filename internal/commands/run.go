@@ -12,6 +12,27 @@ import (
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
 
+type ownershipGuard struct {
+	owned   bool
+	cleanup func()
+}
+
+func newOwnershipGuard(cleanup func()) *ownershipGuard {
+	return &ownershipGuard{owned: true, cleanup: cleanup}
+}
+
+func (g *ownershipGuard) release() {
+	g.owned = false
+}
+
+func (g *ownershipGuard) clean() {
+	if !g.owned {
+		return
+	}
+	g.owned = false
+	g.cleanup()
+}
+
 func Run(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	engineName := fs.String("engine", "", "Engine: sglang|vllm (required)")
@@ -115,12 +136,14 @@ func Run(ctx *app.AppContext, args []string) error {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 	recordDaemon(ctx, serveCfg, serveCmd.Process.Pid)
-	if !*daemon {
-		defer pidfile.Remove(serveCfg.Port)
-	}
+	ownership := newOwnershipGuard(func() {
+		_ = pidfile.Remove(serveCfg.Port)
+		terminateAndReap(serveCmd)
+	})
+	defer ownership.clean()
 	fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("Server started (pid=%d)", serveCmd.Process.Pid)))
 
-	base := fmt.Sprintf("http://127.0.0.1:%d", *port)
+	base := readinessBaseURL(serveCfg.Host, serveCfg.Port)
 
 	fmt.Fprintln(ctx.Stdout)
 	fmt.Fprintln(ctx.Stdout, ui.Step("Phase 4: Readiness"))
@@ -131,8 +154,6 @@ func Run(ctx *app.AppContext, args []string) error {
 		time.Duration(*readinessTimeout)*time.Second,
 	)))
 	if err := waitForBoot(ctx.Ctx, serveCmd, base, time.Duration(*readinessTimeout)*time.Second, serveCfg.LogFile); err != nil {
-		_ = pidfile.Remove(serveCfg.Port)
-		terminateAndReap(serveCmd)
 		return err
 	}
 	fmt.Fprintln(ctx.Stdout, ui.Ok("Server is ready"))
@@ -154,9 +175,13 @@ func Run(ctx *app.AppContext, args []string) error {
 
 	if !*daemon {
 		fmt.Fprintln(ctx.Stdout, ui.Info("Foreground mode: Ctrl+C to stop"))
-		return waitForServer(ctx, serveCmd)
+		err := waitForServer(ctx, serveCmd)
+		_ = pidfile.Remove(serveCfg.Port)
+		ownership.release()
+		return err
 	}
 
+	ownership.release()
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Stop with: hermes stop --port %d", *port)))
 	return nil
 }

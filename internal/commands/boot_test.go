@@ -15,6 +15,30 @@ import (
 	"time"
 )
 
+func TestReadinessBaseURL(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+		want string
+	}{
+		{name: "empty wildcard", host: "", want: "http://127.0.0.1:8080"},
+		{name: "IPv4 wildcard", host: "0.0.0.0", want: "http://127.0.0.1:8080"},
+		{name: "IPv6 wildcard", host: "::", want: "http://[::1]:8080"},
+		{name: "bracketed IPv6 wildcard", host: "[::]", want: "http://[::1]:8080"},
+		{name: "explicit IPv4", host: "192.0.2.10", want: "http://192.0.2.10:8080"},
+		{name: "hostname", host: "inference.internal", want: "http://inference.internal:8080"},
+		{name: "explicit IPv6", host: "2001:db8::10", want: "http://[2001:db8::10]:8080"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := readinessBaseURL(tt.host, 8080); got != tt.want {
+				t.Errorf("readinessBaseURL(%q, 8080) = %q, want %q", tt.host, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTailFileEmptyUnreadableAndInvalidLimit(t *testing.T) {
 	emptyPath := filepath.Join(t.TempDir(), "empty.log")
 	if err := os.WriteFile(emptyPath, nil, 0600); err != nil {
