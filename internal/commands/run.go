@@ -8,6 +8,7 @@ import (
 
 	"github.com/svngoku/hermes-cli/internal/app"
 	"github.com/svngoku/hermes-cli/internal/config"
+	"github.com/svngoku/hermes-cli/internal/gpu"
 	"github.com/svngoku/hermes-cli/internal/pidfile"
 	"github.com/svngoku/hermes-cli/internal/ui"
 )
@@ -20,6 +21,7 @@ func Run(ctx *app.AppContext, args []string) error {
 	host := fs.String("host", "0.0.0.0", "Bind host")
 	port := fs.Int("port", 30000, "Bind port")
 	daemon := fs.Bool("daemon", false, "Run in daemon mode")
+	cudaDevices := fs.String("cuda-devices", "", "CUDA_VISIBLE_DEVICES list (e.g. 0,1); empty inherits environment")
 	installMode := fs.String("install", "both", "Install mode: sglang|vllm|both|none")
 	noVerify := fs.Bool("no-verify", false, "Skip verification")
 	extraArgs := fs.String("extra-args", "", "Additional engine arguments")
@@ -49,6 +51,27 @@ func Run(ctx *app.AppContext, args []string) error {
 		return fmt.Errorf("invalid engine: %s (use sglang or vllm)", *engineName)
 	}
 
+	_, normalizedCUDADevices, err := gpu.ParseCUDADevices(*cudaDevices)
+	if err != nil {
+		return fmt.Errorf("invalid --cuda-devices: %w", err)
+	}
+
+	serveCfg := config.ServeConfig{
+		Engine:      eng,
+		Model:       *model,
+		TP:          *tp,
+		Host:        *host,
+		Port:        *port,
+		Daemon:      true, // run engine in the background while we poll and verify
+		CUDADevices: normalizedCUDADevices,
+		ExtraArgs:   *extraArgs,
+		LogFile:     ctx.LogFile,
+	}
+
+	if err := validateTensorParallel(ctx, serveCfg); err != nil {
+		return err
+	}
+
 	fmt.Fprintln(ctx.Stdout, ui.Banner())
 	fmt.Fprintln(ctx.Stdout, ui.Step("Hermes Pipeline: doctor → install → serve → verify"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
@@ -70,21 +93,6 @@ func Run(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout)
 	fmt.Fprintln(ctx.Stdout, ui.Step("Phase 3: Serve"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
-
-	serveCfg := config.ServeConfig{
-		Engine:    eng,
-		Model:     *model,
-		TP:        *tp,
-		Host:      *host,
-		Port:      *port,
-		Daemon:    true, // run engine in the background while we poll and verify
-		ExtraArgs: *extraArgs,
-		LogFile:   ctx.LogFile,
-	}
-
-	if err := validateTensorParallel(ctx, serveCfg.TP); err != nil {
-		return err
-	}
 
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Starting %s with model %s", serveCfg.Engine, serveCfg.Model)))
 

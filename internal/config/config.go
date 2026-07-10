@@ -19,14 +19,15 @@ const (
 )
 
 type ServeConfig struct {
-	Engine    Engine
-	Model     string
-	TP        int
-	Host      string
-	Port      int
-	Daemon    bool
-	ExtraArgs string
-	LogFile   string
+	Engine      Engine
+	Model       string
+	TP          int
+	Host        string
+	Port        int
+	Daemon      bool
+	CUDADevices string
+	ExtraArgs   string
+	LogFile     string
 }
 
 type InstallConfig struct {

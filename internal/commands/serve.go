@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +45,7 @@ func Serve(ctx *app.AppContext, args []string) error {
 	host := fs.String("host", "0.0.0.0", "Bind host")
 	port := fs.Int("port", 30000, "Bind port")
 	daemon := fs.Bool("daemon", false, "Run in daemon mode")
+	cudaDevices := fs.String("cuda-devices", "", "CUDA_VISIBLE_DEVICES list (e.g. 0,1); empty inherits environment")
 	extraArgs := fs.String("extra-args", "", "Additional engine arguments")
 	fs.Usage = func() {
 		fmt.Fprintln(ctx.Stdout, "Usage: hermes serve [flags]")
@@ -70,31 +72,45 @@ func Serve(ctx *app.AppContext, args []string) error {
 		return fmt.Errorf("invalid engine: %s (use sglang or vllm)", *engineName)
 	}
 
-	cfg := config.ServeConfig{
-		Engine:    eng,
-		Model:     *model,
-		TP:        *tp,
-		Host:      *host,
-		Port:      *port,
-		Daemon:    *daemon,
-		ExtraArgs: *extraArgs,
-		LogFile:   ctx.LogFile,
+	_, normalizedCUDADevices, err := gpu.ParseCUDADevices(*cudaDevices)
+	if err != nil {
+		return fmt.Errorf("invalid --cuda-devices: %w", err)
 	}
 
-	if err := validateTensorParallel(ctx, cfg.TP); err != nil {
+	cfg := config.ServeConfig{
+		Engine:      eng,
+		Model:       *model,
+		TP:          *tp,
+		Host:        *host,
+		Port:        *port,
+		Daemon:      *daemon,
+		CUDADevices: normalizedCUDADevices,
+		ExtraArgs:   *extraArgs,
+		LogFile:     ctx.LogFile,
+	}
+
+	if err := validateTensorParallel(ctx, cfg); err != nil {
 		return err
 	}
 
 	return runServe(ctx, cfg)
 }
 
-func validateTensorParallel(ctx *app.AppContext, tp int) error {
+func validateTensorParallel(ctx *app.AppContext, cfg config.ServeConfig) error {
+	if cfg.CUDADevices != "" {
+		gpuCount, _, err := gpu.ParseCUDADevices(cfg.CUDADevices)
+		if err != nil {
+			return fmt.Errorf("invalid CUDA devices: %w", err)
+		}
+		return config.ValidateTP(cfg.TP, gpuCount)
+	}
+
 	gpuCount, err := gpu.Count(ctx.Ctx)
 	if err != nil {
 		ctx.Logger.Warn("could not query GPU count; skipping tensor parallel capacity validation", "error", err)
 		gpuCount = -1
 	}
-	return config.ValidateTP(tp, gpuCount)
+	return config.ValidateTP(cfg.TP, gpuCount)
 }
 
 func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
@@ -107,6 +123,9 @@ func runServe(ctx *app.AppContext, cfg config.ServeConfig) error {
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("TP:     %d", cfg.TP)))
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Host:   %s", cfg.Host)))
 	fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Port:   %d", cfg.Port)))
+	if cfg.CUDADevices != "" {
+		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("CUDA:   %s", cfg.CUDADevices)))
+	}
 	if cfg.ExtraArgs != "" {
 		fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Extra:  %s", cfg.ExtraArgs)))
 	}
@@ -186,6 +205,9 @@ func startEngine(ctx *app.AppContext, cfg config.ServeConfig) (*exec.Cmd, *os.Fi
 	}
 	cmd := exec.CommandContext(execCtx, cmdName, cmdArgs...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if cfg.CUDADevices != "" {
+		cmd.Env = environmentWithCUDADevices(os.Environ(), cfg.CUDADevices)
+	}
 
 	var logFile *os.File
 	if cfg.LogFile != "" {
@@ -197,6 +219,18 @@ func startEngine(ctx *app.AppContext, cfg config.ServeConfig) (*exec.Cmd, *os.Fi
 	}
 
 	return cmd, logFile, nil
+}
+
+func environmentWithCUDADevices(environ []string, devices string) []string {
+	const key = "CUDA_VISIBLE_DEVICES="
+
+	result := make([]string, 0, len(environ)+1)
+	for _, entry := range environ {
+		if !strings.HasPrefix(entry, key) {
+			result = append(result, entry)
+		}
+	}
+	return append(result, key+devices)
 }
 
 // waitForServer blocks until the engine exits or the operator interrupts. On
