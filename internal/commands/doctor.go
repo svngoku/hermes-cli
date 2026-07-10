@@ -71,38 +71,7 @@ func Doctor(ctx *app.AppContext, args []string) error {
 	report.Checks = append(report.Checks, checkUV(ctx, *jsonOutput))
 	report.Checks = append(report.Checks, checkPython(ctx, *jsonOutput))
 
-	hasOK := false
-	hasWarn := false
-	hasFail := false
-	for _, c := range report.Checks {
-		switch c.Status {
-		case StatusOK:
-			hasOK = true
-		case StatusWarning:
-			hasWarn = true
-		case StatusFail:
-			hasFail = true
-		}
-	}
-
-	if hasFail {
-		report.ExitCode = 3
-		report.Summary = "Some checks failed"
-	} else if hasWarn {
-		if *strict {
-			report.ExitCode = 2
-			report.Summary = "Some checks have warnings (strict mode)"
-		} else {
-			report.ExitCode = 0
-			report.Summary = "All required checks passed (with warnings)"
-		}
-	} else if hasOK {
-		report.ExitCode = 0
-		report.Summary = "All checks passed"
-	} else {
-		report.ExitCode = 3
-		report.Summary = "No checks ran"
-	}
+	report.Summary, report.ExitCode = summarizeDoctor(report.Checks, *strict)
 
 	if *jsonOutput {
 		enc := json.NewEncoder(ctx.Stdout)
@@ -129,6 +98,34 @@ func Doctor(ctx *app.AppContext, args []string) error {
 		return &app.ExitError{Code: report.ExitCode}
 	}
 	return nil
+}
+
+func summarizeDoctor(checks []CheckResult, strict bool) (summary string, exitCode int) {
+	hasOK := false
+	hasWarn := false
+	hasFail := false
+	for _, c := range checks {
+		switch c.Status {
+		case StatusOK:
+			hasOK = true
+		case StatusWarning:
+			hasWarn = true
+		case StatusFail:
+			hasFail = true
+		}
+	}
+
+	if hasFail {
+		return "Some checks failed", 3
+	} else if hasWarn {
+		if strict {
+			return "Some checks have warnings (strict mode)", 2
+		}
+		return "All required checks passed (with warnings)", 0
+	} else if hasOK {
+		return "All checks passed", 0
+	}
+	return "No checks ran", 3
 }
 
 func checkNvidiaSMI(ctx *app.AppContext, jsonOut bool) CheckResult {
