@@ -10,6 +10,7 @@
 
 | Plan | Area | Status | Risk | Created |
 |------|------|--------|------|---------|
+| [2026-07-11 — llama.cpp Engine Support](exec-plans/active/2026-07-11-llamacpp-engine-support.md) | engine, commands, config | draft | medium | 2026-07-11 |
 | [2026-06-28 — Initial Project Setup](exec-plans/active/2026-06-28-initial-setup.md) | Global — foundation | in_progress | low | 2026-06-28 |
 
 ## Completed Plans
