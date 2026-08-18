@@ -86,6 +86,18 @@ func TestDefaultInstallConfig(t *testing.T) {
 	}
 }
 
+func TestParseEngine(t *testing.T) {
+	for _, want := range []Engine{EngineSGLang, EngineVLLM, EngineLlamaCpp} {
+		got, err := ParseEngine(string(want))
+		if err != nil || got != want {
+			t.Errorf("ParseEngine(%q) = %q, %v; want %q, nil", want, got, err, want)
+		}
+	}
+	if _, err := ParseEngine("nope"); err == nil {
+		t.Fatal("ParseEngine(nope) error = nil")
+	}
+}
+
 func TestDefaultStudioConfig(t *testing.T) {
 	c := DefaultStudioConfig()
 	if !c.Enabled {

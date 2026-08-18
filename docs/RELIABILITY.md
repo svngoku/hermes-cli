@@ -13,6 +13,7 @@
 | Serve launch → health-pass | < 90s for cached models | Detect hangs early, surface crash reason. |
 | Crash visibility | Reason shown inline, not buried in logs | Core product belief (see PRODUCT_SENSE). |
 | State file integrity | Never corrupts `~/.cache/hermes/state.json` | Best-effort writes, tolerate missing/garbled. |
+| Config precedence | flags > project > user > built-in | Keep automation and host defaults predictable. |
 
 ## 2. Critical Paths
 
@@ -36,6 +37,7 @@ flowchart TD
 | Failure | Detection | Handling |
 |---------|-----------|----------|
 | `uv` missing | `execx.CommandExists` | Auto-install via official script, re-check. |
+| `llama-server` missing or incompatible | bounded version/help probe | Report manual installation or missing required flags. |
 | Engine import fails | `CheckInstalled` exit code | Report "not installed", offer install path. |
 | Port in use | `assertPortAvailable` via `net.Listen` | Refuse to start before engine launch, tell operator the port. |
 | TP > GPU count | `gpu.Count` + `config.ValidateTP` | Refuse to start, report visible GPU count and requested TP. |
@@ -44,6 +46,7 @@ flowchart TD
 | Daemon boot timeout | `waitForBoot` exceeds `--boot-timeout` | Terminate process group, print crash reason, exit non-zero. |
 | Foreground run interrupted | `ownershipGuard` on SIGINT | Remove pidfile record, reap process group, exit cleanly. |
 | Corrupt state.json | JSON unmarshal error | Reset to empty state, continue. |
+| Corrupt config JSON | JSON unmarshal error | Refuse to launch and identify the invalid file. |
 
 ## 4. Rollback Policy
 

@@ -10,6 +10,8 @@
   - Reasoning: use `--reasoning-parser <name>`; `--enable-reasoning` is deprecated.
 - **SGLang** — https://docs.sglang.io/ (PyPI: https://pypi.org/project/sglang/)
   - Current floor in code: `sglang>=0.5`; requires Python 3.10+.
+- **llama.cpp server** — https://github.com/ggml-org/llama.cpp/tree/master/tools/server
+  - Preinstalled `llama-server`; Hermes supports local, Hugging Face, and URL GGUF sources.
 - **vLLM-Studio** — https://github.com/0xSero/vllm-studio
 
 ## Tooling

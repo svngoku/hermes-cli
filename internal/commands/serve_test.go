@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -29,6 +31,111 @@ func TestEnvironmentWithCUDADevices(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("environmentWithCUDADevices()[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestValidateLlamaCppServeConfig(t *testing.T) {
+	modelPath := filepath.Join(t.TempDir(), "model.gguf")
+	if err := os.WriteFile(modelPath, []byte("test"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	testCtx := newTestAppContext(t)
+	cfg := config.ServeConfig{
+		Engine:    config.EngineLlamaCpp,
+		Model:     modelPath,
+		GPULayers: -1,
+		TP:        1,
+		Host:      "127.0.0.1",
+		Port:      8080,
+	}
+	if err := validateServeConfig(testCtx.AppContext, &cfg); err != nil {
+		t.Fatalf("validateServeConfig() error = %v", err)
+	}
+	if !filepath.IsAbs(cfg.Model) {
+		t.Errorf("validated model = %q, want absolute path", cfg.Model)
+	}
+}
+
+func TestValidateLlamaCppModelSources(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      config.ServeConfig
+		wantText string
+	}{
+		{
+			name:     "missing source",
+			cfg:      config.ServeConfig{},
+			wantText: "exactly one",
+		},
+		{
+			name:     "multiple sources",
+			cfg:      config.ServeConfig{HFRepo: "owner/repo", ModelURL: "https://example.com/model.gguf"},
+			wantText: "exactly one",
+		},
+		{
+			name:     "invalid repo",
+			cfg:      config.ServeConfig{HFRepo: "repo"},
+			wantText: "owner/repository",
+		},
+		{
+			name:     "URL credentials",
+			cfg:      config.ServeConfig{ModelURL: "https://user@example.com/model.gguf"},
+			wantText: "must not contain",
+		},
+		{
+			name:     "URL query",
+			cfg:      config.ServeConfig{ModelURL: "https://example.com/model.gguf?token=x"},
+			wantText: "must not contain",
+		},
+		{
+			name:     "invalid URL scheme",
+			cfg:      config.ServeConfig{ModelURL: "file:///tmp/model.gguf"},
+			wantText: "HTTP(S)",
+		},
+		{
+			name:     "private URL",
+			cfg:      config.ServeConfig{ModelURL: "http://127.0.0.1/model.gguf"},
+			wantText: "public host",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateLlamaCppModelSource(&tt.cfg)
+			if err == nil || !strings.Contains(err.Error(), tt.wantText) {
+				t.Errorf("validateLlamaCppModelSource() error = %v, want %q", err, tt.wantText)
+			}
+		})
+	}
+}
+
+func TestValidateLlamaCppExtraArgs(t *testing.T) {
+	for _, arg := range []string{"--model", "--model=x.gguf", "-hf", "-hfr=owner/repo", "--port=8080", "-ngl"} {
+		t.Run(arg, func(t *testing.T) {
+			if err := validateLlamaCppExtraArgs([]string{arg}); err == nil {
+				t.Errorf("validateLlamaCppExtraArgs(%q) error = nil", arg)
+			}
+		})
+	}
+	if err := validateLlamaCppExtraArgs([]string{"--ctx-size", "4096"}); err != nil {
+		t.Errorf("validateLlamaCppExtraArgs() error = %v", err)
+	}
+}
+
+func TestValidateLlamaCppSkipsGPUCapacity(t *testing.T) {
+	t.Setenv("CUDA_VISIBLE_DEVICES", "")
+	testCtx := newTestAppContext(t)
+	cfg := config.ServeConfig{
+		Engine:    config.EngineLlamaCpp,
+		HFRepo:    "owner/repo",
+		GPULayers: -1,
+		TP:        1,
+	}
+	if err := validateServeConfig(testCtx.AppContext, &cfg); err != nil {
+		t.Fatalf("validateServeConfig() error = %v", err)
+	}
+	cfg.TP = 2
+	if err := validateServeConfig(testCtx.AppContext, &cfg); err == nil {
+		t.Fatal("validateServeConfig() error = nil for llamacpp TP=2")
 	}
 }
 

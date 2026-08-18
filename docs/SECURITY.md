@@ -51,6 +51,7 @@ and runs with the operator's privileges — acceptable for a local CLI, but:
 |------|-------|----------|
 | Model weights | Public/Licensed | Downloaded by engine; respect licenses. |
 | `~/.cache/hermes/state.json` | Non-sensitive | Install status + paths only; no secrets. |
+| User/project Hermes config | Non-sensitive | Mode 0600; engine defaults only; no tokens. |
 | HF tokens | Secret | From env only; never written to state or logs. |
 | Engine stderr | Operational | May contain paths; surfaced to operator only. |
 

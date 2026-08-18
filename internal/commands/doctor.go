@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/svngoku/hermes-cli/internal/app"
+	"github.com/svngoku/hermes-cli/internal/config"
+	"github.com/svngoku/hermes-cli/internal/engine"
 	"github.com/svngoku/hermes-cli/internal/execx"
 	"github.com/svngoku/hermes-cli/internal/gpu"
 	"github.com/svngoku/hermes-cli/internal/ui"
@@ -44,6 +46,7 @@ func Doctor(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	jsonOutput := fs.Bool("json", false, "Output in JSON format")
 	strict := fs.Bool("strict", false, "Fail if any check is missing")
+	engineName := fs.String("engine", "", "Engine requirements: sglang|vllm|llamacpp")
 	fs.Usage = func() {
 		fmt.Fprintln(ctx.Stdout, "Usage: hermes doctor [flags]")
 		fmt.Fprintln(ctx.Stdout)
@@ -53,6 +56,14 @@ func Doctor(ctx *app.AppContext, args []string) error {
 	}
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	var selectedEngine config.Engine
+	if *engineName != "" {
+		var err error
+		selectedEngine, err = config.ParseEngine(*engineName)
+		if err != nil {
+			return err
+		}
 	}
 
 	report := DoctorReport{
@@ -65,11 +76,24 @@ func Doctor(ctx *app.AppContext, args []string) error {
 		fmt.Fprintln(ctx.Stdout, ui.HR())
 	}
 
-	report.Checks = append(report.Checks, checkNvidiaSMI(ctx, *jsonOutput))
-	report.Checks = append(report.Checks, checkCUDA(ctx, *jsonOutput))
-	report.Checks = append(report.Checks, checkGPUs(ctx, *jsonOutput))
-	report.Checks = append(report.Checks, checkUV(ctx, *jsonOutput))
-	report.Checks = append(report.Checks, checkPython(ctx, *jsonOutput))
+	selectedAdapter := engine.Get(selectedEngine)
+	if selectedAdapter != nil && !selectedAdapter.Profile().RequiresNVIDIA {
+		result := checkEngine(ctx, selectedEngine, true)
+		report.Checks = append(report.Checks, result)
+		if !*jsonOutput {
+			if result.Status == StatusOK {
+				fmt.Fprintln(ctx.Stdout, ui.Ok(result.Name+": "+result.Message))
+			} else {
+				fmt.Fprintln(ctx.Stdout, ui.Fail(result.Name+": "+result.Message))
+			}
+		}
+	} else {
+		report.Checks = append(report.Checks, checkNvidiaSMI(ctx, *jsonOutput))
+		report.Checks = append(report.Checks, checkCUDA(ctx, *jsonOutput))
+		report.Checks = append(report.Checks, checkGPUs(ctx, *jsonOutput))
+		report.Checks = append(report.Checks, checkUV(ctx, *jsonOutput))
+		report.Checks = append(report.Checks, checkPython(ctx, *jsonOutput))
+	}
 
 	report.Summary, report.ExitCode = summarizeDoctor(report.Checks, *strict)
 
@@ -98,6 +122,29 @@ func Doctor(ctx *app.AppContext, args []string) error {
 		return &app.ExitError{Code: report.ExitCode}
 	}
 	return nil
+}
+
+func checkEngine(ctx *app.AppContext, selectedEngine config.Engine, _ bool) CheckResult {
+	check := CheckResult{Name: string(selectedEngine)}
+	eng := engine.Get(selectedEngine)
+	if eng == nil {
+		check.Status = StatusFail
+		check.Message = "unknown engine"
+		return check
+	}
+	installed, version, err := eng.CheckInstalled(ctx.Ctx)
+	switch {
+	case err != nil:
+		check.Status = StatusFail
+		check.Message = err.Error()
+	case !installed:
+		check.Status = StatusFail
+		check.Message = "llama-server not found; install llama.cpp and ensure llama-server is on PATH"
+	default:
+		check.Status = StatusOK
+		check.Message = version
+	}
+	return check
 }
 
 func summarizeDoctor(checks []CheckResult, strict bool) (summary string, exitCode int) {

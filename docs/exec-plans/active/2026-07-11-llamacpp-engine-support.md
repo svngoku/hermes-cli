@@ -1,10 +1,10 @@
 ---
 title: "llama.cpp Engine Support"
 area: "engine, commands, config"
-status: draft
+status: in_progress
 risk: medium
 created: 2026-07-11
-updated: 2026-07-11
+updated: 2026-08-18
 author: agent
 ---
 
@@ -236,8 +236,8 @@ Changes:
 - Add `llamacpp` install mode; leave `both` unchanged and do not add `all` in
   this release.
 - Make an omitted `run --install` engine-aware without adding a public `auto`
-  value: resolve omission to historical `both` for SGLang/vLLM and to
-  `llamacpp` for llama.cpp.
+  value: install or validate only the engine selected by `--engine`. Explicit
+  `--install both` retains its existing SGLang + vLLM meaning.
 - For `run --engine llamacpp`, accept only omitted
   `--install`, `--install llamacpp`, or `--install none`;
   reject Python-engine modes so the native path cannot trigger `uv` or venv
@@ -423,3 +423,4 @@ SGLang/vLLM state and behavior must remain valid throughout.
 | 2026-07-11 | Scope confirmed: preinstalled cross-platform binary, local/HF/URL GGUF, GPU layers only, TP fixed at 1. |
 | 2026-07-11 | Draft implementation plan created; no production code changed. |
 | 2026-07-11 | Architecture and simplicity reviews approved the amended plan; implementation tracked in `hermes-cli-ak7`. |
+| 2026-08-18 | Implemented engine, model safety, native install/doctor paths, lifecycle integration, and tests. Real GPU/llama-server release smoke test remains. |

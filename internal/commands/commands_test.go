@@ -19,6 +19,7 @@ type testAppContext struct {
 
 func newTestAppContext(t *testing.T) *testAppContext {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
 
 	commandCtx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -88,7 +89,7 @@ func TestCommandValidation(t *testing.T) {
 			name:    "run requires engine",
 			command: Run,
 			args:    []string{"--model", "m"},
-			want:    "--engine and --model are required",
+			want:    "--engine is required",
 		},
 		{
 			name:    "run rejects nonpositive readiness timeout",

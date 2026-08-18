@@ -41,16 +41,17 @@ flowchart TD
         config[internal/config<br/>typed config structs]
     end
     subgraph Domain["Domain"]
-        engine[internal/engine<br/>Engine interface: sglang, vllm]
+        engine[internal/engine<br/>Engine interface: sglang, vllm, llamacpp]
     end
     subgraph Runtime["Runtime / orchestration"]
-        commands[internal/commands<br/>doctor, install, serve, verify, studio, run, stop, status]
+        commands[internal/commands<br/>setup, doctor, install, serve, verify, studio, run, stop, status]
         app[internal/app<br/>AppContext, global wiring]
     end
     subgraph Edges["Impure edges (I/O, processes)"]
         execx[internal/execx<br/>process execution]
         gpu[internal/gpu<br/>GPU inventory probes]
         pidfile[internal/pidfile<br/>daemon registry]
+        settingsstore[internal/settingsstore<br/>user/project config I/O]
     end
     subgraph UI["Presentation"]
         ui[internal/ui<br/>Lip Gloss styles]
@@ -64,11 +65,13 @@ flowchart TD
     commands --> execx
     commands --> gpu
     commands --> pidfile
+    commands --> settingsstore
     commands --> ui
     commands --> tui
     engine --> config
     engine --> execx
     gpu --> execx
+    settingsstore --> config
     tui --> ui
 ```
 
@@ -89,20 +92,24 @@ classDiagram
     class Engine {
         <<interface>>
         +Name() string
+        +Profile() RuntimeProfile
         +CheckInstalled(ctx) (bool, string, error)
         +Install(ctx) error
         +ServeCommand(cfg ServeConfig) (string, []string)
     }
     class SGLangEngine
     class VLLMEngine
+    class LlamaCppEngine
     Engine <|.. SGLangEngine
     Engine <|.. VLLMEngine
+    Engine <|.. LlamaCppEngine
     SGLangEngine ..> ServeConfig
     VLLMEngine ..> ServeConfig
+    LlamaCppEngine ..> ServeConfig
 ```
 
-Adding a new engine means implementing `Engine` and registering it in
-`engine.Get` — no command code changes.
+Engine profiles separate uv/Python/NVIDIA engines from preinstalled native
+engines. Commands use those capabilities for doctor, install, and TP behavior.
 
 ---
 

@@ -62,13 +62,13 @@ func saveState(state *InstallState) error {
 
 func Install(ctx *app.AppContext, args []string) error {
 	fs := flag.NewFlagSet("install", flag.ExitOnError)
-	installMode := fs.String("install", "both", "Install mode: sglang|vllm|both|none")
+	installMode := fs.String("install", "both", "Install mode: sglang|vllm|llamacpp|both|none")
 	check := fs.Bool("check", false, "Check installation status without changes")
 	venvDir := fs.String("venv", ".venv", "Virtual environment directory")
 	fs.Usage = func() {
 		fmt.Fprintln(ctx.Stdout, "Usage: hermes install [flags]")
 		fmt.Fprintln(ctx.Stdout)
-		fmt.Fprintln(ctx.Stdout, "Install inference engines (sglang, vllm)")
+		fmt.Fprintln(ctx.Stdout, "Install or check inference engines")
 		fmt.Fprintln(ctx.Stdout)
 		fs.PrintDefaults()
 	}
@@ -78,7 +78,7 @@ func Install(ctx *app.AppContext, args []string) error {
 
 	mode := config.InstallMode(*installMode)
 	if mode != config.InstallSGLang && mode != config.InstallVLLM &&
-		mode != config.InstallBoth && mode != config.InstallNone {
+		mode != config.InstallLlamaCpp && mode != config.InstallBoth && mode != config.InstallNone {
 		return fmt.Errorf("invalid install mode: %s", *installMode)
 	}
 
@@ -87,36 +87,48 @@ func Install(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 
 	state, _ := loadState()
-
-	if err := ensureUV(ctx, state); err != nil {
-		return err
+	engines := selectedEngines(mode)
+	absVenvPath, err := filepath.Abs(*venvDir)
+	if err != nil {
+		return fmt.Errorf("resolve venv path: %w", err)
 	}
 
-	if !*check && mode != config.InstallNone {
-		if err := setupVenv(ctx, *venvDir, state); err != nil {
-			return err
+	if !*check {
+		for _, eng := range engines {
+			if eng.Profile().Kind == engine.RuntimeUVPython {
+				if err := ensureUV(ctx, state); err != nil {
+					return err
+				}
+				if err := setupVenv(ctx, *venvDir, state); err != nil {
+					return err
+				}
+				break
+			}
 		}
 	}
 
-	sglangEngine := engine.Get(config.EngineSGLang)
-	vllmEngine := engine.Get(config.EngineVLLM)
-
-	installed, version, _ := sglangEngine.CheckInstalled(ctx.Ctx)
-	state.SGLangInstalled = installed
-	state.SGLangVersion = version
-	if installed {
-		fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("sglang: %s", version)))
-	} else {
-		fmt.Fprintln(ctx.Stdout, ui.Warn("sglang: not installed"))
+	type engineStatus struct {
+		engine    engine.Engine
+		installed bool
+		version   string
 	}
-
-	installed, version, _ = vllmEngine.CheckInstalled(ctx.Ctx)
-	state.VLLMInstalled = installed
-	state.VLLMVersion = version
-	if installed {
-		fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("vllm: %s", version)))
-	} else {
-		fmt.Fprintln(ctx.Stdout, ui.Warn("vllm: not installed"))
+	statuses := make([]engineStatus, 0, len(engines))
+	for _, eng := range engines {
+		venvPath := ""
+		if eng.Profile().Kind == engine.RuntimeUVPython {
+			venvPath = absVenvPath
+		}
+		installed, version, err := engine.CheckInstalledIn(ctx.Ctx, eng, venvPath)
+		if err != nil {
+			return err
+		}
+		updateInstallState(state, eng.Name(), installed, version)
+		statuses = append(statuses, engineStatus{engine: eng, installed: installed, version: version})
+		if installed {
+			fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("%s: %s", eng.Name(), version)))
+		} else {
+			fmt.Fprintln(ctx.Stdout, ui.Warn(fmt.Sprintf("%s: not installed", eng.Name())))
+		}
 	}
 
 	if *check {
@@ -125,7 +137,7 @@ func Install(ctx *app.AppContext, args []string) error {
 		return nil
 	}
 
-	if mode == config.InstallNone {
+	if len(engines) == 0 {
 		fmt.Fprintln(ctx.Stdout, ui.HR())
 		fmt.Fprintln(ctx.Stdout, ui.Info("Install mode: none - skipping engine installation"))
 		return nil
@@ -134,46 +146,67 @@ func Install(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 	fmt.Fprintln(ctx.Stdout, ui.Step("Installing engines..."))
 
-	if mode == config.InstallSGLang || mode == config.InstallBoth {
-		if !state.SGLangInstalled {
-			fmt.Fprintln(ctx.Stdout, ui.Info("Installing sglang..."))
-			if err := sglangEngine.Install(ctx.Ctx); err != nil {
-				fmt.Fprintln(ctx.Stdout, ui.Fail("sglang installation failed: "+err.Error()))
+	for _, status := range statuses {
+		if !status.installed {
+			fmt.Fprintln(ctx.Stdout, ui.Info(fmt.Sprintf("Installing %s...", status.engine.Name())))
+			venvPath := ""
+			if status.engine.Profile().Kind == engine.RuntimeUVPython {
+				venvPath = absVenvPath
+			}
+			if err := engine.InstallIn(ctx.Ctx, status.engine, venvPath); err != nil {
+				fmt.Fprintln(ctx.Stdout, ui.Fail(status.engine.Name()+" installation failed: "+err.Error()))
 				return err
 			}
-			installed, version, _ := sglangEngine.CheckInstalled(ctx.Ctx)
-			state.SGLangInstalled = installed
-			state.SGLangVersion = version
-			fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("sglang installed: %s", version)))
+			installed, version, err := engine.CheckInstalledIn(ctx.Ctx, status.engine, venvPath)
+			if err != nil {
+				return err
+			}
+			if !installed {
+				return fmt.Errorf("%s installation completed but the engine is still unavailable", status.engine.Name())
+			}
+			updateInstallState(state, status.engine.Name(), installed, version)
+			fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("%s installed: %s", status.engine.Name(), version)))
 		} else {
-			fmt.Fprintln(ctx.Stdout, ui.Ok("sglang already installed"))
+			fmt.Fprintln(ctx.Stdout, ui.Ok(status.engine.Name()+" already installed"))
 		}
 	}
 
-	if mode == config.InstallVLLM || mode == config.InstallBoth {
-		if !state.VLLMInstalled {
-			fmt.Fprintln(ctx.Stdout, ui.Info("Installing vllm..."))
-			if err := vllmEngine.Install(ctx.Ctx); err != nil {
-				fmt.Fprintln(ctx.Stdout, ui.Fail("vllm installation failed: "+err.Error()))
-				return err
-			}
-			installed, version, _ := vllmEngine.CheckInstalled(ctx.Ctx)
-			state.VLLMInstalled = installed
-			state.VLLMVersion = version
-			fmt.Fprintln(ctx.Stdout, ui.Ok(fmt.Sprintf("vllm installed: %s", version)))
-		} else {
-			fmt.Fprintln(ctx.Stdout, ui.Ok("vllm already installed"))
+	if mode != config.InstallLlamaCpp {
+		if err := saveState(state); err != nil {
+			ctx.Logger.Warn("failed to save state", "error", err)
 		}
-	}
-
-	if err := saveState(state); err != nil {
-		ctx.Logger.Warn("failed to save state", "error", err)
 	}
 
 	fmt.Fprintln(ctx.Stdout, ui.HR())
 	fmt.Fprintln(ctx.Stdout, ui.Ok("Installation complete"))
 
 	return nil
+}
+
+func selectedEngines(mode config.InstallMode) []engine.Engine {
+	switch mode {
+	case config.InstallSGLang:
+		return []engine.Engine{engine.Get(config.EngineSGLang)}
+	case config.InstallVLLM:
+		return []engine.Engine{engine.Get(config.EngineVLLM)}
+	case config.InstallLlamaCpp:
+		return []engine.Engine{engine.Get(config.EngineLlamaCpp)}
+	case config.InstallBoth:
+		return []engine.Engine{engine.Get(config.EngineSGLang), engine.Get(config.EngineVLLM)}
+	default:
+		return nil
+	}
+}
+
+func updateInstallState(state *InstallState, name string, installed bool, version string) {
+	switch name {
+	case string(config.EngineSGLang):
+		state.SGLangInstalled = installed
+		state.SGLangVersion = version
+	case string(config.EngineVLLM):
+		state.VLLMInstalled = installed
+		state.VLLMVersion = version
+	}
 }
 
 func ensureUV(ctx *app.AppContext, state *InstallState) error {

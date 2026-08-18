@@ -1,6 +1,6 @@
 # Hermes — GPU Inference Server Launcher
 
-A beautiful CLI for launching and monitoring LLM serving engines (SGLang, vLLM) on GPU infrastructure.
+A CLI for launching and monitoring SGLang, vLLM, and llama.cpp inference servers.
 
 Built with Go and the [Charm](https://charm.sh) ecosystem for delightful terminal UX.
 
@@ -27,16 +27,18 @@ just build
 ### Requirements
 
 - Go 1.24+
-- NVIDIA GPU with `nvidia-smi`
-- Python 3.10+ (for engine installation)
+- NVIDIA GPU with `nvidia-smi` for SGLang/vLLM
+- Python 3.10+ for SGLang/vLLM installation
+- Preinstalled `llama-server` for llama.cpp (CPU, Metal, or CUDA)
 - [`just`](https://github.com/casey/just) (task runner, for development)
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `hermes setup` | Detect hardware, prepare an engine, and save defaults |
 | `hermes doctor` | Check GPU, CUDA, and system requirements |
-| `hermes install` | Install inference engines (sglang, vllm) |
+| `hermes install` | Install or check inference engines |
 | `hermes serve` | Start inference server |
 | `hermes verify` | Verify server is responding |
 | `hermes studio` | Launch vllm-studio controller |
@@ -47,18 +49,25 @@ just build
 ## Quick Start
 
 ```bash
-# Check system requirements
-hermes doctor
+# Guided GPU-host setup, installation, and saved defaults
+hermes setup
 
-# Install engines
-hermes install --install both
-
-# Start server
-hermes serve --engine sglang --model meta-llama/Llama-3-8B --tp 1
-
-# Or run the full pipeline
-hermes run --engine vllm --model mistralai/Mistral-7B-v0.1 --tp 1
+# Uses saved defaults
+hermes run
 ```
+
+`setup` can also be automated, for example:
+
+```bash
+hermes setup --non-interactive --scope user --engine vllm \
+  --model Qwen/Qwen3-8B
+```
+
+User defaults are stored in the platform config directory. Project defaults
+are stored in `.hermes.json`, override user defaults, and can be selected with
+`hermes setup --scope project`. Explicit command flags override saved values.
+SGLang/vLLM setup uses one managed environment under the user cache directory
+by default, so later `run` and `serve` commands use the same installation.
 
 ## Usage Examples
 
@@ -86,6 +95,9 @@ hermes install --install sglang
 
 # Check installation status without changes
 hermes install --check
+
+# Validate a preinstalled llama-server
+hermes install --install llamacpp --check
 ```
 
 ### Serve
@@ -105,6 +117,13 @@ hermes serve --engine vllm --model Qwen/Qwen3-8B --cuda-devices 0,1,2,3 --tp 4
 
 # With extra engine arguments
 hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
+
+# llama.cpp with a local GGUF
+hermes serve --engine llamacpp --model ./model.gguf --gpu-layers 99
+
+# llama.cpp can also resolve GGUF from Hugging Face or a public URL
+hermes serve --engine llamacpp --hf-repo owner/model-GGUF:Q4_K_M
+hermes serve --engine llamacpp --model-url https://models.example/model.gguf
 ```
 
 ### Daemon management
@@ -166,10 +185,11 @@ internal/
   app/                   # AppContext, global config, Charm logger
   commands/              # Command implementations
   config/                # Typed config structs
-  engine/                # Engine interface (sglang, vllm)
+  engine/                # Engine interface (sglang, vllm, llamacpp)
   execx/                 # Process execution helpers
   gpu/                   # GPU inventory (nvidia-smi) + CUDA device parsing
   pidfile/               # Daemon registry (PID records)
+  settingsstore/         # User/project config persistence
   ui/                    # Lip Gloss styles
   ui/tui/                # Bubble Tea components (spinner, steps, forms)
 ```
@@ -183,6 +203,11 @@ internal/
 **vLLM** (broader support):
 - ✅ Most HF models (Llama, Qwen, Mistral, custom architectures)
 - ✅ Better for new/experimental models
+
+**llama.cpp** (native, cross-platform):
+- ✅ GGUF models on CPU, Metal, or CUDA
+- ✅ Local files, Hugging Face GGUF repositories, and public HTTP(S) URLs
+- ⚠️ Base GGUF models may not include a usable chat template; use `verify --chat` explicitly
 
 ## API Examples
 
@@ -223,5 +248,6 @@ just check     # Run all checks
 
 - [SGLang](https://github.com/sgl-project/sglang)
 - [vLLM](https://github.com/vllm-project/vllm)
+- [llama.cpp](https://github.com/ggml-org/llama.cpp)
 - [vLLM-Studio](https://github.com/0xSero/vllm-studio)
 - [Charm](https://charm.sh) — Bubble Tea, Lip Gloss, Huh, Log

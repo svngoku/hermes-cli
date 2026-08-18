@@ -1,32 +1,41 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Engine string
 
 const (
-	EngineSGLang Engine = "sglang"
-	EngineVLLM   Engine = "vllm"
+	EngineSGLang   Engine = "sglang"
+	EngineVLLM     Engine = "vllm"
+	EngineLlamaCpp Engine = "llamacpp"
 )
 
 type InstallMode string
 
 const (
-	InstallSGLang InstallMode = "sglang"
-	InstallVLLM   InstallMode = "vllm"
-	InstallBoth   InstallMode = "both"
-	InstallNone   InstallMode = "none"
+	InstallSGLang   InstallMode = "sglang"
+	InstallVLLM     InstallMode = "vllm"
+	InstallLlamaCpp InstallMode = "llamacpp"
+	InstallBoth     InstallMode = "both"
+	InstallNone     InstallMode = "none"
 )
 
 type ServeConfig struct {
 	Engine      Engine
 	Model       string
+	HFRepo      string
+	ModelURL    string
+	GPULayers   int
 	TP          int
 	Host        string
 	Port        int
 	Daemon      bool
 	CUDADevices string
-	ExtraArgs   string
+	VenvPath    string
+	ExtraArgs   []string
 	LogFile     string
 }
 
@@ -50,10 +59,24 @@ type StudioConfig struct {
 
 func DefaultServeConfig() ServeConfig {
 	return ServeConfig{
-		Engine: EngineSGLang,
-		TP:     1,
-		Host:   "0.0.0.0",
-		Port:   30000,
+		Engine:    EngineSGLang,
+		GPULayers: -1,
+		TP:        1,
+		Host:      "0.0.0.0",
+		Port:      30000,
+	}
+}
+
+func ParseEngine(value string) (Engine, error) {
+	switch Engine(strings.ToLower(strings.TrimSpace(value))) {
+	case EngineSGLang:
+		return EngineSGLang, nil
+	case EngineVLLM:
+		return EngineVLLM, nil
+	case EngineLlamaCpp:
+		return EngineLlamaCpp, nil
+	default:
+		return "", fmt.Errorf("invalid engine: %s (use sglang, vllm, or llamacpp)", value)
 	}
 }
 

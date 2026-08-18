@@ -117,6 +117,7 @@ type CommandFunc func(ctx *app.AppContext, args []string) error
 
 var commandRegistry = map[string]CommandFunc{
 	"doctor":  commands.Doctor,
+	"setup":   commands.Setup,
 	"install": commands.Install,
 	"serve":   commands.Serve,
 	"verify":  commands.Verify,
@@ -145,14 +146,15 @@ func printVersion() {
 func printUsage() {
 	fmt.Print(ui.Banner())
 	fmt.Println()
-	fmt.Println("GPU inference server launcher for sglang and vllm")
+	fmt.Println("Inference server launcher for SGLang, vLLM, and llama.cpp")
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  hermes <command> [flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
+	fmt.Println("  setup     Configure a GPU host and save reusable defaults")
 	fmt.Println("  doctor    Check GPU, CUDA, and system requirements")
-	fmt.Println("  install   Install inference engines (sglang, vllm)")
+	fmt.Println("  install   Install or check inference engines")
 	fmt.Println("  serve     Start inference server")
 	fmt.Println("  verify    Verify server is responding")
 	fmt.Println("  studio    Launch vllm-studio controller")
@@ -173,11 +175,13 @@ func printUsage() {
 
 	fmt.Println()
 	fmt.Println("Examples:")
+	fmt.Println("  hermes setup")
 	fmt.Println("  hermes doctor --json")
 	fmt.Println("  hermes install --install sglang")
 	fmt.Println("  hermes serve --engine vllm --model meta-llama/Llama-3-8B --tp 1")
 	fmt.Println("  hermes serve --engine vllm --model Qwen/Qwen3-8B --cuda-devices 0,1 --tp 2")
 	fmt.Println("  hermes run --engine sglang --model mymodel --daemon")
+	fmt.Println("  hermes serve --engine llamacpp --model ./model.gguf")
 	fmt.Println("  hermes stop --port 30000")
 	fmt.Println()
 	fmt.Println("For command-specific help:")

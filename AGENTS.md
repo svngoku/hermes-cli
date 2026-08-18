@@ -4,7 +4,7 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 ## Project Overview
 
-Hermes CLI is a GPU inference server launcher for sglang and vllm, built with Go and the Charm ecosystem.
+Hermes CLI is an inference server launcher for SGLang, vLLM, and llama.cpp, built with Go and the Charm ecosystem.
 
 ## Tech Stack
 
@@ -31,8 +31,9 @@ internal/
   app/              # AppContext, global config
   commands/         # Command implementations (doctor, install, serve, verify, studio, run)
   config/           # Typed config structs
-  engine/           # Engine interface (sglang, vllm)
+  engine/           # Engine interface (sglang, vllm, llamacpp)
   execx/            # Process execution helpers
+  settingsstore/    # User/project config persistence
   ui/               # Lip Gloss styles
   ui/tui/           # Bubble Tea components (spinner, steps, forms)
 ```

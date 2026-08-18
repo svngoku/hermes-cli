@@ -1,12 +1,15 @@
 package engine
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
-// splitArgs splits a command-line argument string into fields, honoring single
+// ParseArgs splits a command-line argument string into fields, honoring single
 // and double quotes so values containing spaces are preserved. It is a small,
 // dependency-free shell-word splitter and does not perform variable, glob, or
 // backslash-escape expansion.
-func splitArgs(s string) []string {
+func ParseArgs(s string) ([]string, error) {
 	var args []string
 	var cur strings.Builder
 	inSingle := false
@@ -48,7 +51,10 @@ func splitArgs(s string) []string {
 			hasToken = true
 		}
 	}
+	if inSingle || inDouble {
+		return nil, fmt.Errorf("unterminated quote in --extra-args")
+	}
 	flush()
 
-	return args
+	return args, nil
 }

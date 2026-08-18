@@ -25,10 +25,19 @@ func TestSplitArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := splitArgs(tt.in)
+			got, err := ParseArgs(tt.in)
+			if err != nil {
+				t.Fatalf("ParseArgs(%q) error = %v", tt.in, err)
+			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("splitArgs(%q) = %#v, want %#v", tt.in, got, tt.want)
+				t.Errorf("ParseArgs(%q) = %#v, want %#v", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseArgsRejectsUnterminatedQuotes(t *testing.T) {
+	if _, err := ParseArgs(`--x "unterminated`); err == nil {
+		t.Fatal("ParseArgs() error = nil, want unterminated quote error")
 	}
 }
