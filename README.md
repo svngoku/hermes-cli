@@ -118,8 +118,13 @@ hermes serve --engine vllm --model Qwen/Qwen3-8B --cuda-devices 0,1,2,3 --tp 4
 # With extra engine arguments
 hermes serve --engine vllm --model Qwen/Qwen3-8B --extra-args "--reasoning-parser qwen3"
 
-# llama.cpp with a local GGUF
-hermes serve --engine llamacpp --model ./model.gguf --gpu-layers 99
+# llama.cpp with a local GGUF and optimized Qwen3.8 settings
+hermes serve --engine llamacpp \
+  --model ./Qwen3.8-27B-Q4_K_M.gguf \
+  --gpu-layers 999 \
+  --extra-args "-c 131072 -fa 1 \
+    --cache-type-k q4_0 --cache-type-v q4_0 \
+    --spec-type draft-mtp --spec-draft-n-max 2 --parallel 1"
 
 # llama.cpp can also resolve GGUF from Hugging Face or a public URL
 hermes serve --engine llamacpp --hf-repo owner/model-GGUF:Q4_K_M
