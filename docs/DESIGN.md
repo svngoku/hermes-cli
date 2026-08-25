@@ -69,9 +69,9 @@ engines pure and testable, and lets commands decide foreground vs daemon.
 
 ```go
 func (e *VLLMEngine) ServeCommand(cfg config.ServeConfig) (string, []string) {
-    args := []string{"run", "vllm", "serve", cfg.Model, "--port", strconv.Itoa(cfg.Port)}
+    args := []string{"serve", cfg.Model, "--port", strconv.Itoa(cfg.Port)}
     args = append(args, cfg.ExtraArgs...)
-    return "uv", args
+    return vllmBinary, args // ~/vllm-env/bin/vllm when present
 }
 ```
 

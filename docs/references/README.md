@@ -6,17 +6,18 @@
 ## Inference Engines
 
 - **vLLM** — https://docs.vllm.ai/ (PyPI: https://pypi.org/project/vllm/)
-  - Current floor in code: `vllm>=0.8`
+  - Installed via `pip install -U vllm` into `~/vllm-env`.
   - Reasoning: use `--reasoning-parser <name>`; `--enable-reasoning` is deprecated.
 - **SGLang** — https://docs.sglang.io/ (PyPI: https://pypi.org/project/sglang/)
-  - Current floor in code: `sglang>=0.5`; requires Python 3.10+.
+  - Installed via `pip install -U "sglang[all]"` into `~/sglang-env`; requires Python 3.10+.
 - **llama.cpp server** — https://github.com/ggml-org/llama.cpp/tree/master/tools/server
-  - Preinstalled `llama-server`; Hermes supports local, Hugging Face, and URL GGUF sources.
+  - Built from source (`git clone` + CMake, `-DGGML_CUDA=ON` when NVIDIA and `nvcc` are available)
+    into `~/.local/bin`; Hermes supports local, Hugging Face, and URL GGUF sources.
+  - Build docs: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md
 - **vLLM-Studio** — https://github.com/0xSero/vllm-studio
 
 ## Tooling
 
-- **uv** — https://docs.astral.sh/uv/
 - **Go** — https://go.dev/doc/
 
 ## Charm Ecosystem (UI)

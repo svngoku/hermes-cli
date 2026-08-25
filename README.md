@@ -28,8 +28,11 @@ just build
 
 - Go 1.24+
 - NVIDIA GPU with `nvidia-smi` for SGLang/vLLM
-- Python 3.10+ for SGLang/vLLM installation
-- Preinstalled `llama-server` for llama.cpp (CPU, Metal, or CUDA)
+- Python 3.10+ with venv support for SGLang/vLLM (`sudo apt install python3-venv` on Ubuntu)
+- `git`, `cmake`, and a C++ toolchain for the llama.cpp source build
+  (`sudo apt install git cmake build-essential libcurl4-openssl-dev` on Ubuntu),
+  plus the CUDA toolkit (`nvcc`) when an NVIDIA GPU is visible; or a preinstalled
+  `llama-server`
 - [`just`](https://github.com/casey/just) (task runner, for development)
 
 ## Commands
@@ -66,8 +69,8 @@ hermes setup --non-interactive --scope user --engine vllm \
 User defaults are stored in the platform config directory. Project defaults
 are stored in `.hermes.json`, override user defaults, and can be selected with
 `hermes setup --scope project`. Explicit command flags override saved values.
-SGLang/vLLM setup uses one managed environment under the user cache directory
-by default, so later `run` and `serve` commands use the same installation.
+Each Python engine installs into its own virtual environment (`~/sglang-env`,
+`~/vllm-env`), so later `run` and `serve` commands reuse the same installation.
 
 ## Usage Examples
 
@@ -86,19 +89,40 @@ hermes doctor --strict
 
 ### Install Engines
 
+Installation mirrors the recommended upstream flows without `sudo`, and every
+step streams live to the terminal so you can watch long downloads and builds:
+
+- **SGLang** → `~/sglang-env` virtual environment, `pip install -U "sglang[all]"`
+- **vLLM** → `~/vllm-env` virtual environment, `pip install -U vllm`
+- **llama.cpp** → cloned to `~/llama.cpp`, built with CMake in Release mode
+  (`-DGGML_CUDA=ON` is added automatically when an NVIDIA GPU is detected), and
+  `llama-server`/`llama-cli` are installed into `~/.local/bin`
+
 ```bash
-# Install both engines
+# Install SGLang and vLLM
 hermes install --install both
+
+# Install everything, including the llama.cpp source build
+hermes install --install all
 
 # Install only sglang
 hermes install --install sglang
 
+# Build and install llama.cpp only
+hermes install --install llamacpp
+
 # Check installation status without changes
 hermes install --check
-
-# Validate a preinstalled llama-server
-hermes install --install llamacpp --check
 ```
+
+If `~/.local/bin` is not on your `PATH`, add it after installing llama.cpp:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+To avoid host engine installation, build the [CUDA 13 inference image](docker/inference/README.md).
+It keeps all three runtimes isolated and launches one engine per container.
 
 ### Serve
 

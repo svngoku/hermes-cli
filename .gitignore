@@ -36,4 +36,12 @@ __pycache__/
 .venv/
 
 # Hermes state
-.hermes/
+.hermes/*
+hermes.log
+
+# Cursor
+.cursorindexingignore
+.specstory/*
+
+# Pi session state
+.pi/tasks/

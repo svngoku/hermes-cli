@@ -4,7 +4,7 @@
 
 | Spec | Status | Owner |
 |------|--------|-------|
-| _No specs yet_ | — | — |
+| [Unified inference container](unified-inference-container.md) | in_progress | agent |
 
 ---
 

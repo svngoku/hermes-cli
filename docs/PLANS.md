@@ -10,6 +10,8 @@
 
 | Plan | Area | Status | Risk | Created |
 |------|------|--------|------|---------|
+| [2026-08-25 — Unified CUDA inference container](exec-plans/active/2026-08-25-unified-inference-container.md) | docker, docs | in_progress | medium | 2026-08-25 |
+| [2026-08-18 — Spec-aligned streamed engine install](exec-plans/active/2026-08-18-streamed-spec-install.md) | engine, commands | in_progress | medium | 2026-08-18 |
 | [2026-07-11 — llama.cpp Engine Support](exec-plans/active/2026-07-11-llamacpp-engine-support.md) | engine, commands, config | in_progress | medium | 2026-07-11 |
 | [2026-06-28 — Initial Project Setup](exec-plans/active/2026-06-28-initial-setup.md) | Global — foundation | in_progress | low | 2026-06-28 |
 

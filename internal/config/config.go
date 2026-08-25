@@ -20,6 +20,7 @@ const (
 	InstallVLLM     InstallMode = "vllm"
 	InstallLlamaCpp InstallMode = "llamacpp"
 	InstallBoth     InstallMode = "both"
+	InstallAll      InstallMode = "all"
 	InstallNone     InstallMode = "none"
 )
 

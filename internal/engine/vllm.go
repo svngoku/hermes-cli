@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 
@@ -17,21 +17,23 @@ func (e *VLLMEngine) Name() string {
 }
 
 func (e *VLLMEngine) Profile() RuntimeProfile {
-	return RuntimeProfile{Kind: RuntimeUVPython, RequiresNVIDIA: true, SupportsTensorParallel: true}
+	return RuntimeProfile{Kind: RuntimePythonVenv, RequiresNVIDIA: true, SupportsTensorParallel: true}
+}
+
+func (e *VLLMEngine) venvDir() string {
+	return defaultVenvPath("vllm")
 }
 
 func (e *VLLMEngine) CheckInstalled(ctx context.Context) (bool, string, error) {
-	result := execx.Run(ctx, "uv", "run", "python", "-c", "import vllm; print(vllm.__version__)")
-	if result.ExitCode == 0 {
-		return true, result.Stdout, nil
+	if python, ok := venvExecutable(e.venvDir(), "python"); ok {
+		result := execx.Run(ctx, python, "-c", "import vllm; print(vllm.__version__)")
+		if result.ExitCode == 0 {
+			return true, result.Stdout, nil
+		}
 	}
 
-	result = execx.Run(ctx, "python", "-c", "import vllm; print(vllm.__version__)")
-	if result.ExitCode == 0 {
-		return true, result.Stdout, nil
-	}
-
-	result = execx.Run(ctx, "vllm", "--version")
+	// A PATH installation is launchable by ServeCommand too.
+	result := execx.Run(ctx, "vllm", "--version")
 	if result.ExitCode == 0 {
 		return true, result.Stdout, nil
 	}
@@ -39,33 +41,22 @@ func (e *VLLMEngine) CheckInstalled(ctx context.Context) (bool, string, error) {
 	return false, "", nil
 }
 
-func (e *VLLMEngine) Install(ctx context.Context) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "-U", "vllm>=0.8")
-	if result.ExitCode != 0 {
-		return fmt.Errorf("failed to install vllm: %s", result.Stderr)
-	}
-	return nil
-}
-
-func (e *VLLMEngine) CheckInstalledIn(ctx context.Context, venvPath string) (bool, string, error) {
-	result := execx.Run(ctx, filepath.Join(venvPath, "bin", "python"), "-c", "import vllm; print(vllm.__version__)")
-	return result.ExitCode == 0, result.Stdout, nil
-}
-
-func (e *VLLMEngine) InstallIn(ctx context.Context, venvPath string) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "--python", filepath.Join(venvPath, "bin", "python"), "-U", "vllm>=0.8")
-	if result.ExitCode != 0 {
-		return fmt.Errorf("failed to install vllm: %s", result.Stderr)
-	}
-	return nil
+func (e *VLLMEngine) Install(ctx context.Context, stdout, stderr io.Writer) error {
+	return installPythonEngine(ctx, stdout, stderr, e.venvDir(), "vllm")
 }
 
 func (e *VLLMEngine) ServeCommand(cfg config.ServeConfig) (string, []string) {
-	binary := "uv"
-	args := []string{"run", "vllm"}
-	if cfg.VenvPath != "" {
-		binary = filepath.Join(cfg.VenvPath, "bin", "vllm")
+	binary := "vllm"
+	var args []string
+	switch venvDir := cfg.VenvPath; {
+	case venvDir != "":
+		binary = filepath.Join(venvDir, "bin", "vllm")
 		args = nil
+	default:
+		if vllm, ok := venvExecutable(e.venvDir(), "vllm"); ok {
+			binary = vllm
+			args = nil
+		}
 	}
 	args = append(args,
 		"serve", cfg.Model,

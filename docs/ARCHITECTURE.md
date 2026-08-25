@@ -13,7 +13,8 @@ in Go with the Charm ecosystem for terminal UI.
 ```mermaid
 flowchart LR
     user([Operator]) -->|hermes serve/run/doctor| cli[Hermes CLI]
-    cli -->|uv pip install / venv| uv[(uv toolchain)]
+    cli -->|python3 venv + pip| venvs[(~/sglang-env, ~/vllm-env)]
+    cli -->|git clone + cmake| llamasrc[(~/llama.cpp → ~/.local/bin)]
     cli -->|launch process| engine{Inference Engine}
     engine --> sglang[sglang.launch_server]
     engine --> vllm[vllm serve]
@@ -25,8 +26,10 @@ flowchart LR
 ```
 
 The CLI is an orchestrator: it never serves inference itself. It detects the
-environment, installs engines via `uv`, launches the chosen engine as a
-subprocess, and verifies the resulting OpenAI-compatible endpoint.
+environment, installs engines (per-engine Python venvs for SGLang/vLLM, a
+CMake source build for llama.cpp), launches the chosen engine as a
+subprocess, and verifies the resulting OpenAI-compatible endpoint. Install
+output streams live so long builds stay observable.
 
 ---
 
@@ -108,7 +111,7 @@ classDiagram
     LlamaCppEngine ..> ServeConfig
 ```
 
-Engine profiles separate uv/Python/NVIDIA engines from preinstalled native
+Engine profiles separate Python-venv/NVIDIA engines from preinstalled native
 engines. Commands use those capabilities for doctor, install, and TP behavior.
 
 ---
@@ -191,7 +194,9 @@ stateDiagram-v2
 - **CLI:** custom subcommand router (no Cobra) — keep dependencies minimal.
 - **UI:** Charm ecosystem (Bubble Tea, Bubbles, Lip Gloss, Huh).
 - **Logging:** `charmbracelet/log` (structured, level-aware).
-- **Engine install/runtime:** `uv` for Python venv + package management.
+- **Engine install/runtime:** `python3 -m venv` + `pip` into per-engine venvs
+  (`~/sglang-env`, `~/vllm-env`); llama.cpp builds from source via CMake into
+  `~/.local/bin`. No `sudo`, no `uv` requirement.
 - **Build:** `just build`; quality gate `just check` (vet + test + build).
 
 ---

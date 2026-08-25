@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -36,6 +38,21 @@ func TestSetupNonInteractiveSavesUserDefaults(t *testing.T) {
 	}
 	if !strings.Contains(testCtx.stdout.String(), "Configuration saved") {
 		t.Errorf("stdout = %q", testCtx.stdout)
+	}
+}
+
+func TestRunDoctorAllowsLlamaInstallBeforeBinaryExists(t *testing.T) {
+	binDir := t.TempDir()
+	for _, tool := range []string{"git", "cmake", "make"} {
+		if err := os.WriteFile(filepath.Join(binDir, tool), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", binDir)
+	testCtx := newTestAppContext(t)
+
+	if err := runDoctorPhase(testCtx.AppContext, config.EngineLlamaCpp, config.InstallLlamaCpp); err != nil {
+		t.Fatalf("runDoctorPhase() error = %v", err)
 	}
 }
 
@@ -78,7 +95,7 @@ func TestSetupAutoTPUsesSelectedCUDADevices(t *testing.T) {
 	if settings.CUDADevices == nil || *settings.CUDADevices != "2,3" {
 		t.Errorf("CUDA devices = %#v", settings.CUDADevices)
 	}
-	if settings.VenvPath == "" {
-		t.Error("VenvPath is empty")
+	if settings.VenvPath != "" {
+		t.Errorf("VenvPath = %q, want empty (engines self-locate their venvs)", settings.VenvPath)
 	}
 }

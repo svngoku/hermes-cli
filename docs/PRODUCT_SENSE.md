@@ -18,7 +18,7 @@ journey
       See GPU/CUDA/Python status: 5: Operator
     section Install
       hermes install --install vllm: 4: Operator
-      uv sets up venv + engine: 5: CLI
+      CLI creates ~/vllm-env + pip installs, streamed: 5: CLI
     section Serve
       hermes serve --engine vllm --model ...: 5: Operator
       Health check passes: 5: CLI
@@ -36,8 +36,8 @@ journey
    lifecycle while explicit profiles preserve their runtime differences.
 4. **Honest output.** Show the real crash reason immediately; never silently
    redirect failures into a log the operator has to hunt for.
-5. **Minimal dependencies.** A static Go binary that shells out to `uv` beats a
-   heavyweight framework.
+5. **Minimal dependencies.** A static Go binary that shells out to
+   `python3`/`pip` and `cmake` beats a heavyweight framework.
 
 ## 3. Non-Goals
 

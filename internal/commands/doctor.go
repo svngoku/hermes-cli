@@ -91,8 +91,8 @@ func Doctor(ctx *app.AppContext, args []string) error {
 		report.Checks = append(report.Checks, checkNvidiaSMI(ctx, *jsonOutput))
 		report.Checks = append(report.Checks, checkCUDA(ctx, *jsonOutput))
 		report.Checks = append(report.Checks, checkGPUs(ctx, *jsonOutput))
-		report.Checks = append(report.Checks, checkUV(ctx, *jsonOutput))
 		report.Checks = append(report.Checks, checkPython(ctx, *jsonOutput))
+		report.Checks = append(report.Checks, checkPythonVenv(ctx, *jsonOutput))
 	}
 
 	report.Summary, report.ExitCode = summarizeDoctor(report.Checks, *strict)
@@ -280,24 +280,39 @@ func checkGPUs(ctx *app.AppContext, jsonOut bool) CheckResult {
 	return check
 }
 
-func checkUV(ctx *app.AppContext, jsonOut bool) CheckResult {
-	check := CheckResult{Name: "uv"}
+// checkPythonVenv verifies the venv/ensurepip support that `hermes install`
+// needs to create the per-engine environments (python3-venv on Ubuntu).
+func checkPythonVenv(ctx *app.AppContext, jsonOut bool) CheckResult {
+	check := CheckResult{Name: "python-venv"}
 
-	if !execx.CommandExists("uv") {
+	pythonCmd := "python3"
+	if !execx.CommandExists("python3") {
+		if !execx.CommandExists("python") {
+			check.Status = StatusWarning
+			check.Message = "python not found"
+			if !jsonOut {
+				fmt.Fprintln(ctx.Stdout, ui.Warn("python not found"))
+			}
+			return check
+		}
+		pythonCmd = "python"
+	}
+
+	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, pythonCmd, "-c", "import ensurepip, venv")
+	if result.ExitCode != 0 {
 		check.Status = StatusWarning
-		check.Message = "uv not found (will install during hermes install)"
+		check.Message = "python venv support missing (on Ubuntu: sudo apt install -y python3-venv)"
+		check.Details = result.Stderr
 		if !jsonOut {
-			fmt.Fprintln(ctx.Stdout, ui.Warn("uv not found (will install during hermes install)"))
+			fmt.Fprintln(ctx.Stdout, ui.Warn(check.Message))
 		}
 		return check
 	}
 
-	result := execx.RunWithTimeout(ctx.Ctx, doctorProbeTimeout, "uv", "--version")
-	version := strings.TrimSpace(result.Stdout)
 	check.Status = StatusOK
-	check.Message = version
+	check.Message = "venv + ensurepip available"
 	if !jsonOut {
-		fmt.Fprintln(ctx.Stdout, ui.Ok("uv: "+version))
+		fmt.Fprintln(ctx.Stdout, ui.Ok("python venv support available"))
 	}
 	return check
 }

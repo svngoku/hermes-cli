@@ -124,14 +124,14 @@ func Run(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout)
 	fmt.Fprintln(ctx.Stdout, ui.Step("Phase 1: Doctor"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
-	if err := runDoctorPhase(ctx, eng); err != nil {
+	if err := runDoctorPhase(ctx, eng, resolvedInstallMode); err != nil {
 		return err
 	}
 
 	fmt.Fprintln(ctx.Stdout)
 	fmt.Fprintln(ctx.Stdout, ui.Step("Phase 2: Install"))
 	fmt.Fprintln(ctx.Stdout, ui.HR())
-	if err := runInstallPhase(ctx, resolvedInstallMode, serveCfg.VenvPath); err != nil {
+	if err := runInstallPhase(ctx, resolvedInstallMode); err != nil {
 		return err
 	}
 
@@ -208,7 +208,16 @@ func Run(ctx *app.AppContext, args []string) error {
 	return nil
 }
 
-func runDoctorPhase(ctx *app.AppContext, selectedEngine config.Engine) error {
+func runDoctorPhase(ctx *app.AppContext, selectedEngine config.Engine, installMode config.InstallMode) error {
+	if selectedEngine == config.EngineLlamaCpp && installMode != config.InstallNone {
+		if err := engine.CheckLlamaCppBuildPrerequisites(); err != nil {
+			fmt.Fprintln(ctx.Stdout, ui.Warn("llamacpp-build: "+err.Error()))
+			return fmt.Errorf("critical doctor checks failed")
+		}
+		fmt.Fprintln(ctx.Stdout, ui.Ok("llamacpp-build: build prerequisites available"))
+		return nil
+	}
+
 	selectedAdapter := engine.Get(selectedEngine)
 	if selectedAdapter != nil && !selectedAdapter.Profile().RequiresNVIDIA {
 		result := checkEngine(ctx, selectedEngine, true)
@@ -228,13 +237,13 @@ func runDoctorPhase(ctx *app.AppContext, selectedEngine config.Engine) error {
 			result := checkNvidiaSMI(ctx, true)
 			return result.Status == StatusOK, result.Message
 		}},
-		{"uv", func() (bool, string) {
-			result := checkUV(ctx, true)
-			return result.Status == StatusOK || result.Status == StatusWarning, result.Message
-		}},
 		{"python", func() (bool, string) {
 			result := checkPython(ctx, true)
 			return result.Status == StatusOK, result.Message
+		}},
+		{"python-venv", func() (bool, string) {
+			result := checkPythonVenv(ctx, true)
+			return result.Status == StatusOK || result.Status == StatusWarning, result.Message
 		}},
 	}
 
@@ -257,17 +266,13 @@ func runDoctorPhase(ctx *app.AppContext, selectedEngine config.Engine) error {
 	return nil
 }
 
-func runInstallPhase(ctx *app.AppContext, mode config.InstallMode, venvPath string) error {
+func runInstallPhase(ctx *app.AppContext, mode config.InstallMode) error {
 	if mode == config.InstallNone {
 		fmt.Fprintln(ctx.Stdout, ui.Info("Skipping installation (--install none)"))
 		return nil
 	}
 
-	installArgs := []string{"--install", string(mode)}
-	if venvPath != "" {
-		installArgs = append(installArgs, "--venv", venvPath)
-	}
-	return Install(ctx, installArgs)
+	return Install(ctx, []string{"--install", string(mode)})
 }
 
 func resolveRunInstallMode(selectedEngine config.Engine, requested config.InstallMode) (config.InstallMode, error) {
@@ -279,7 +284,7 @@ func resolveRunInstallMode(selectedEngine config.Engine, requested config.Instal
 		return "", fmt.Errorf("llamacpp only supports --install llamacpp or --install none")
 	}
 	switch requested {
-	case config.InstallSGLang, config.InstallVLLM, config.InstallLlamaCpp, config.InstallBoth, config.InstallNone:
+	case config.InstallSGLang, config.InstallVLLM, config.InstallLlamaCpp, config.InstallBoth, config.InstallAll, config.InstallNone:
 		return requested, nil
 	default:
 		return "", fmt.Errorf("invalid install mode: %s", requested)

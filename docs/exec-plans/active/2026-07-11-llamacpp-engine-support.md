@@ -424,3 +424,4 @@ SGLang/vLLM state and behavior must remain valid throughout.
 | 2026-07-11 | Draft implementation plan created; no production code changed. |
 | 2026-07-11 | Architecture and simplicity reviews approved the amended plan; implementation tracked in `hermes-cli-ak7`. |
 | 2026-08-18 | Implemented engine, model safety, native install/doctor paths, lifecycle integration, and tests. Real GPU/llama-server release smoke test remains. |
+| 2026-08-18 | Operator request superseded the manual-install non-goal: `hermes install --install llamacpp` now builds llama.cpp from source (clone `~/llama.cpp`, CMake Release, `-DGGML_CUDA=ON` when NVIDIA and `nvcc` are available) into `~/.local/bin` with streamed output. See `2026-08-18-streamed-spec-install.md`. |

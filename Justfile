@@ -43,6 +43,11 @@ tidy:
 run *ARGS: build
     ./bin/hermes {{ARGS}}
 
+# Validate the inference container dispatcher without building the GPU image
+container-check:
+    bash -n docker/inference/entrypoint.sh docker/inference/entrypoint_test.sh
+    docker/inference/entrypoint_test.sh
+
 # Full quality gate: lint + test + build
-check: lint test build
+check: container-check lint test build
     @echo "All checks passed"

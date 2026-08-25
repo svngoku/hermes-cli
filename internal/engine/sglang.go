@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"path/filepath"
 	"strconv"
 
@@ -17,50 +17,51 @@ func (e *SGLangEngine) Name() string {
 }
 
 func (e *SGLangEngine) Profile() RuntimeProfile {
-	return RuntimeProfile{Kind: RuntimeUVPython, RequiresNVIDIA: true, SupportsTensorParallel: true}
+	return RuntimeProfile{Kind: RuntimePythonVenv, RequiresNVIDIA: true, SupportsTensorParallel: true}
+}
+
+func (e *SGLangEngine) venvDir() string {
+	return defaultVenvPath("sglang")
 }
 
 func (e *SGLangEngine) CheckInstalled(ctx context.Context) (bool, string, error) {
-	result := execx.Run(ctx, "uv", "run", "python", "-c", "import sglang; print(sglang.__version__)")
-	if result.ExitCode == 0 {
-		return true, result.Stdout, nil
+	if python, ok := venvExecutable(e.venvDir(), "python"); ok {
+		result := execx.Run(ctx, python, "-c", "import sglang; print(sglang.__version__)")
+		if result.ExitCode == 0 {
+			return true, result.Stdout, nil
+		}
 	}
 
-	result = execx.Run(ctx, "python", "-c", "import sglang; print(sglang.__version__)")
-	if result.ExitCode == 0 {
-		return true, result.Stdout, nil
+	// A system Python installation is launchable by ServeCommand too.
+	if python, err := python3(); err == nil {
+		result := execx.Run(ctx, python, "-c", "import sglang; print(sglang.__version__)")
+		if result.ExitCode == 0 {
+			return true, result.Stdout, nil
+		}
 	}
 
 	return false, "", nil
 }
 
-func (e *SGLangEngine) Install(ctx context.Context) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "-U", "sglang>=0.5")
-	if result.ExitCode != 0 {
-		return fmt.Errorf("failed to install sglang: %s", result.Stderr)
-	}
-	return nil
-}
-
-func (e *SGLangEngine) CheckInstalledIn(ctx context.Context, venvPath string) (bool, string, error) {
-	result := execx.Run(ctx, filepath.Join(venvPath, "bin", "python"), "-c", "import sglang; print(sglang.__version__)")
-	return result.ExitCode == 0, result.Stdout, nil
-}
-
-func (e *SGLangEngine) InstallIn(ctx context.Context, venvPath string) error {
-	result := execx.Run(ctx, "uv", "pip", "install", "--python", filepath.Join(venvPath, "bin", "python"), "-U", "sglang>=0.5")
-	if result.ExitCode != 0 {
-		return fmt.Errorf("failed to install sglang: %s", result.Stderr)
-	}
-	return nil
+func (e *SGLangEngine) Install(ctx context.Context, stdout, stderr io.Writer) error {
+	return installPythonEngine(ctx, stdout, stderr, e.venvDir(), "sglang[all]")
 }
 
 func (e *SGLangEngine) ServeCommand(cfg config.ServeConfig) (string, []string) {
-	binary := "uv"
-	args := []string{"run", "python"}
-	if cfg.VenvPath != "" {
-		binary = filepath.Join(cfg.VenvPath, "bin", "python")
+	binary := "python3"
+	if python, err := python3(); err == nil {
+		binary = python
+	}
+	var args []string
+	switch venvDir := cfg.VenvPath; {
+	case venvDir != "":
+		binary = filepath.Join(venvDir, "bin", "python")
 		args = nil
+	default:
+		if python, ok := venvExecutable(e.venvDir(), "python"); ok {
+			binary = python
+			args = nil
+		}
 	}
 	args = append(args,
 		"-m", "sglang.launch_server",

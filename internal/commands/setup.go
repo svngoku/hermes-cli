@@ -3,8 +3,6 @@ package commands
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/charmbracelet/huh"
 	"github.com/svngoku/hermes-cli/internal/app"
@@ -16,10 +14,6 @@ import (
 )
 
 func Setup(ctx *app.AppContext, args []string) error {
-	defaultVenv, err := defaultManagedVenvPath()
-	if err != nil {
-		return err
-	}
 	fs := flag.NewFlagSet("setup", flag.ExitOnError)
 	engineName := fs.String("engine", "", "Engine: sglang|vllm|llamacpp")
 	model := fs.String("model", "", "Model path or Hugging Face repo")
@@ -30,7 +24,6 @@ func Setup(ctx *app.AppContext, args []string) error {
 	port := fs.Int("port", 30000, "Default bind port")
 	cudaDevices := fs.String("cuda-devices", "", "Default CUDA_VISIBLE_DEVICES list")
 	gpuLayers := fs.Int("gpu-layers", -1, "llama.cpp GPU layers")
-	venvPath := fs.String("venv", defaultVenv, "Managed SGLang/vLLM virtual environment")
 	scope := fs.String("scope", "", "Config scope: user|project")
 	install := fs.Bool("install", true, "Install or validate the selected engine")
 	nonInteractive := fs.Bool("non-interactive", false, "Require all choices through flags")
@@ -105,12 +98,6 @@ func Setup(ctx *app.AppContext, args []string) error {
 		Port:        *port,
 		CUDADevices: normalizedCUDADevices,
 	}
-	if selectedAdapter.Profile().Kind == engine.RuntimeUVPython {
-		serveCfg.VenvPath, err = filepath.Abs(*venvPath)
-		if err != nil {
-			return fmt.Errorf("resolve venv path: %w", err)
-		}
-	}
 	if err := validateServeConfig(ctx, &serveCfg); err != nil {
 		return err
 	}
@@ -118,11 +105,7 @@ func Setup(ctx *app.AppContext, args []string) error {
 	if *install {
 		mode := config.InstallMode(eng)
 		fmt.Fprintln(ctx.Stdout, ui.Step("Preparing "+string(eng)+"..."))
-		installArgs := []string{"--install", string(mode)}
-		if serveCfg.VenvPath != "" {
-			installArgs = append(installArgs, "--venv", serveCfg.VenvPath)
-		}
-		if err := Install(ctx, installArgs); err != nil {
+		if err := Install(ctx, []string{"--install", string(mode)}); err != nil {
 			return err
 		}
 	}
@@ -139,7 +122,6 @@ func Setup(ctx *app.AppContext, args []string) error {
 		Host:        serveCfg.Host,
 		Port:        serveCfg.Port,
 		CUDADevices: &cudaDeviceValue,
-		VenvPath:    serveCfg.VenvPath,
 	}
 	path, err := settingsstore.Save(settings, *scope)
 	if err != nil {
@@ -148,14 +130,6 @@ func Setup(ctx *app.AppContext, args []string) error {
 	fmt.Fprintln(ctx.Stdout, ui.Ok("Configuration saved: "+path))
 	fmt.Fprintln(ctx.Stdout, ui.Info("Run `hermes run` to use these defaults"))
 	return nil
-}
-
-func defaultManagedVenvPath() (string, error) {
-	cacheDir, err := os.UserCacheDir()
-	if err != nil {
-		return "", fmt.Errorf("locate user cache directory: %w", err)
-	}
-	return filepath.Join(cacheDir, "hermes", "venv"), nil
 }
 
 func promptSetupChoices(engineName, scope *string) error {

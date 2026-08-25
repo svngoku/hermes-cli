@@ -28,5 +28,5 @@ Then add a row to the table above.
 ## Candidate decisions to record
 
 - Why a custom subcommand router instead of Cobra.
-- Why `uv` for engine install/runtime over pip/conda.
+- Why per-engine `python3 -m venv` + `pip` installs over uv/conda.
 - Engine interface boundary (`ServeCommand` returns args, does not run).

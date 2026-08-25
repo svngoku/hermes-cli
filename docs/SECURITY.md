@@ -12,9 +12,11 @@
    are validated/whitelisted before being passed to a subprocess.
 3. **No untrusted shell interpolation.** Build process args as `[]string`
    (`execx.Run(ctx, bin, args...)`), never string-concatenate user input into
-   `sh -c`. The single `sh -c` use (uv installer) runs a fixed, trusted URL.
-4. **Least privilege.** Never invoke `sudo`. Engine installs go into a project
-   venv, not system Python.
+   `sh -c`. No `curl | sh` installers: engines install via `pip` from PyPI or
+   a pinned-URL `git clone` of the upstream llama.cpp repository.
+4. **Least privilege.** Never invoke `sudo`. Engine installs go into
+   per-engine venvs (`~/sglang-env`, `~/vllm-env`) or user-writable
+   `~/.local/bin`, never system Python or `/usr/local`.
 5. **Bind intentionally.** Default serve host is configurable; document that
    `0.0.0.0` exposes the engine on the network.
 
@@ -24,14 +26,17 @@
 flowchart LR
     subgraph trusted[Trusted: operator + local host]
         cli[Hermes CLI]
-        venv[(project venv)]
+        venv[(~/sglang-env, ~/vllm-env)]
+        bin[(~/.local/bin)]
     end
     subgraph external[External / untrusted-ish]
         net[(Network clients hitting engine port)]
         models[(Model weights from HF)]
-        installer[(astral.sh uv install script)]
+        pypi[(PyPI packages)]
+        upstream[(github.com/ggml-org/llama.cpp)]
     end
-    cli -->|fixed URL, https| installer
+    cli -->|pip install, streamed| pypi
+    cli -->|git clone, fixed URL| upstream
     cli -->|downloads via engine| models
     net -->|HTTP requests| engine[Engine process]
     cli -. owns/launches .-> engine

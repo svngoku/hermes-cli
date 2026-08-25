@@ -20,11 +20,11 @@
 ```mermaid
 flowchart TD
     doctor[doctor: GPU/CUDA/Python checks] --> install
-    install[install: uv venv + engine] --> serve
+    install[install: per-engine venv + pip / cmake build] --> serve
     serve[serve/run: launch engine subprocess] --> verify
     verify[verify: HTTP health + sample request] --> ready[(serving)]
 
-    install -. failure .-> reason1[surface uv/pip stderr]
+    install -. failure .-> reason1[pip/cmake output streamed live]
     serve -. crash .-> reason2[surface engine stderr immediately]
 ```
 
@@ -36,8 +36,9 @@ flowchart TD
 
 | Failure | Detection | Handling |
 |---------|-----------|----------|
-| `uv` missing | `execx.CommandExists` | Auto-install via official script, re-check. |
-| `llama-server` missing or incompatible | bounded version/help probe | Report manual installation or missing required flags. |
+| `python3` or venv support missing | `execx.CommandExists` + `ensurepip` probe | Print `apt install python3-venv` hint; never run `sudo`. |
+| llama.cpp build tools missing | `execx.CommandExists` for git/cmake/make | Print `apt install git cmake build-essential` hint. |
+| `llama-server` missing or incompatible | bounded version/help probe (PATH, then `~/.local/bin`) | Offer the source-build install; report missing required flags. |
 | Engine import fails | `CheckInstalled` exit code | Report "not installed", offer install path. |
 | Port in use | `assertPortAvailable` via `net.Listen` | Refuse to start before engine launch, tell operator the port. |
 | TP > GPU count | `gpu.Count` + `config.ValidateTP` | Refuse to start, report visible GPU count and requested TP. |
